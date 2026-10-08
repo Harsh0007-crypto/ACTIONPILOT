@@ -1,7 +1,7 @@
 /**
  * ActionPilot Main Application Controller
- * Ultra-clean judge experience:
- * GOAL -> AI PLAN -> APPROVE -> EXECUTE -> DONE
+ * Ultra-clean judge experience with 5 sequential workflow stages:
+ * UNDERSTAND -> PLAN -> APPROVE -> EXECUTE -> COMPLETE
  */
 
 const App = {
@@ -20,13 +20,13 @@ const App = {
   },
 
   bindEvents() {
-    // Run / Plan with AI Button
+    // 1. Run / Plan with AI Button
     const btnRun = document.getElementById("btnRunAgent");
     if (btnRun) {
       btnRun.addEventListener("click", () => this.handlePlanGoal());
     }
 
-    // Goal Input Enter key (Shift+Enter for newline)
+    // 2. Goal Input Enter key (Shift+Enter for newline)
     const goalInput = document.getElementById("goalInput");
     if (goalInput) {
       goalInput.addEventListener("keydown", (e) => {
@@ -37,7 +37,7 @@ const App = {
       });
     }
 
-    // Example Prompts
+    // 3. Example Prompts
     const exampleChips = document.querySelectorAll(".example-chip");
     exampleChips.forEach(chip => {
       chip.addEventListener("click", () => {
@@ -52,38 +52,34 @@ const App = {
       });
     });
 
-    // Brand link returns home
+    // 4. Brand link returns home
     const brandHomeLink = document.getElementById("brandHomeLink");
     if (brandHomeLink) {
       brandHomeLink.addEventListener("click", (e) => {
         e.preventDefault();
-        this.resetToHomeView();
+        this.resetToHomeView(false);
       });
     }
 
-    // "Approve & Execute" Button on Primary Plan Card
-    const btnApproveExecute = document.getElementById("btnApproveAndExecute");
-    if (btnApproveExecute) {
-      btnApproveExecute.addEventListener("click", () => this.handleExecutePlan());
+    // 5. "Approve & Execute" Button in Approval block
+    const btnApproveAction = document.getElementById("btnApproveAction");
+    if (btnApproveAction) {
+      btnApproveAction.addEventListener("click", () => this.handleApproveAndExecute());
     }
 
-    // Cancel Plan Button
-    const btnCancelPlan = document.getElementById("btnCancelPlan");
-    if (btnCancelPlan) {
-      btnCancelPlan.addEventListener("click", () => {
-        this.resetToHomeView(false); // keep input
-      });
+    // 6. "Reject" Button in Approval block
+    const btnRejectAction = document.getElementById("btnRejectAction");
+    if (btnRejectAction) {
+      btnRejectAction.addEventListener("click", () => this.handleRejectAction());
     }
 
-    // "Start Another Task" Button
-    const btnStartAnother = document.getElementById("btnStartAnother");
-    if (btnStartAnother) {
-      btnStartAnother.addEventListener("click", () => {
-        this.handleResetState();
-      });
+    // 7. "Start Another Task" Button
+    const btnStartNewGoal = document.getElementById("btnStartNewGoal");
+    if (btnStartNewGoal) {
+      btnStartNewGoal.addEventListener("click", () => this.handleResetState());
     }
 
-    // "View Details" Button (Toggle Expandable Drawer)
+    // 8. "View Created Items" Button (Toggles Secondary Details Drawer)
     const btnToggleDetails = document.getElementById("btnToggleDetails");
     const detailsDrawer = document.getElementById("detailsDrawer");
     const toggleDetailsText = document.getElementById("toggleDetailsBtnText");
@@ -94,11 +90,11 @@ const App = {
         const isHidden = detailsDrawer.classList.contains("hidden");
         if (isHidden) {
           detailsDrawer.classList.remove("hidden");
-          if (toggleDetailsText) toggleDetailsText.textContent = "Hide Details";
+          if (toggleDetailsText) toggleDetailsText.textContent = "Hide Created Items";
           detailsDrawer.scrollIntoView({ behavior: "smooth" });
         } else {
           detailsDrawer.classList.add("hidden");
-          if (toggleDetailsText) toggleDetailsText.textContent = "View Details";
+          if (toggleDetailsText) toggleDetailsText.textContent = "View Created Items";
         }
       });
     }
@@ -106,17 +102,17 @@ const App = {
     if (btnCloseDetails && detailsDrawer) {
       btnCloseDetails.addEventListener("click", () => {
         detailsDrawer.classList.add("hidden");
-        if (toggleDetailsText) toggleDetailsText.textContent = "View Details";
+        if (toggleDetailsText) toggleDetailsText.textContent = "View Created Items";
       });
     }
 
-    // Reset Workspace Button
+    // 9. Reset Workspace Button
     const btnReset = document.getElementById("btnResetState");
     if (btnReset) {
       btnReset.addEventListener("click", () => this.handleResetState());
     }
 
-    // Settings Modal
+    // 10. Settings Modal (Optional Gemini API Key)
     const btnSettings = document.getElementById("btnSettings");
     const settingsModal = document.getElementById("settingsModal");
     const btnCloseSettings = document.getElementById("btnCloseSettings");
@@ -163,11 +159,11 @@ const App = {
 
       this.updateEngineBadge(
         isConfigured,
-        hasCustom ? "Gemini Key Active" : (data.geminiConfigured ? "Gemini 2.5 Flash Online" : "Autonomous Engine (Deterministic)")
+        hasCustom ? "Gemini Key Active" : (data.geminiConfigured ? "Gemini 2.5 Flash Online" : "Autonomous Engine (Fallback Mode)")
       );
     } catch (err) {
       console.warn("Health check error:", err);
-      this.updateEngineBadge(false, "Autonomous Engine Ready");
+      this.updateEngineBadge(false, "Autonomous Engine (Fallback Mode)");
     }
   },
 
@@ -195,7 +191,43 @@ const App = {
   },
 
   // ==========================================
-  // STAGE 1: PLAN GOAL
+  // STEPPER PROGRESSION
+  // ==========================================
+  setStepper(stage) {
+    // stage: 1 ('understand'), 2 ('plan'), 3 ('approve'), 4 ('execute'), 5 ('complete')
+    const steps = [
+      { id: "step-understand", div: "sdiv-1" },
+      { id: "step-plan", div: "sdiv-2" },
+      { id: "step-approve", div: "sdiv-3" },
+      { id: "step-execute", div: "sdiv-4" },
+      { id: "step-complete", div: null }
+    ];
+
+    steps.forEach((step, idx) => {
+      const el = document.getElementById(step.id);
+      const div = step.div ? document.getElementById(step.div) : null;
+      const stepNum = idx + 1;
+
+      if (el) {
+        el.classList.remove("active", "completed");
+        if (stepNum < stage) {
+          el.classList.add("completed");
+        } else if (stepNum === stage) {
+          el.classList.add("active");
+        }
+      }
+
+      if (div) {
+        div.classList.remove("completed");
+        if (stepNum < stage) {
+          div.classList.add("completed");
+        }
+      }
+    });
+  },
+
+  // ==========================================
+  // STAGES 1 & 2: UNDERSTAND + PLAN
   // ==========================================
   async handlePlanGoal() {
     const input = document.getElementById("goalInput");
@@ -233,8 +265,8 @@ const App = {
       this.activePlan = planData.plan;
       this.stats = { tasks: 0, schedule: 0, notes: 0 };
 
-      // Transition UI: Hide Hero Input, Reveal Primary Result Card
-      this.showPlanCard(this.activePlan);
+      // Render Stage 1 (Understand) & Stage 2 (Plan) & Reveal Approval card
+      this.renderPlanWorkflow(this.activePlan);
 
     } catch (err) {
       console.error("Planning error:", err);
@@ -245,40 +277,64 @@ const App = {
     }
   },
 
-  showPlanCard(plan) {
+  renderPlanWorkflow(plan) {
     const hero = document.getElementById("heroCenterpiece");
-    const section = document.getElementById("planCardSection");
-    const primaryCard = document.getElementById("primaryPlanCard");
-    const progressCard = document.getElementById("executionProgressCard");
-    const completeCard = document.getElementById("missionCompleteCard");
-    const drawer = document.getElementById("detailsDrawer");
+    const workflowSection = document.getElementById("workflowCardSection");
+    const blockExecute = document.getElementById("blockExecute");
+    const blockComplete = document.getElementById("blockComplete");
+    const detailsDrawer = document.getElementById("detailsDrawer");
 
     if (hero) hero.classList.add("hero-compact");
-    if (section) section.classList.remove("hidden");
-    if (primaryCard) primaryCard.classList.remove("hidden");
-    if (progressCard) progressCard.classList.add("hidden");
-    if (completeCard) completeCard.classList.add("hidden");
-    if (drawer) drawer.classList.add("hidden");
+    if (workflowSection) workflowSection.classList.remove("hidden");
+    if (blockExecute) blockExecute.classList.add("hidden");
+    if (blockComplete) blockComplete.classList.add("hidden");
+    if (detailsDrawer) detailsDrawer.classList.add("hidden");
 
-    // Populate Plan Card elements
-    const goalEl = document.getElementById("displayGoalText");
-    const summaryEl = document.getElementById("displaySummaryText");
-    const sourceEl = document.getElementById("planSourcePill");
-    const actionsListEl = document.getElementById("displayActionsList");
-    const timeEl = document.getElementById("displayEstimatedTime");
-    const assumptionBox = document.getElementById("metaAssumptionBox");
-    const assumptionEl = document.getElementById("displayAssumption");
+    // Reset details drawer button text
+    const toggleDetailsText = document.getElementById("toggleDetailsBtnText");
+    if (toggleDetailsText) toggleDetailsText.textContent = "View Created Items";
 
-    if (goalEl) goalEl.textContent = plan.goal;
-    if (summaryEl) summaryEl.textContent = plan.summary;
-    if (sourceEl) sourceEl.textContent = plan.source || "Autonomous Engine";
+    // 1. POPULATE UNDERSTAND BLOCK
+    const engineTag = document.getElementById("engineSourceTag");
+    const goalText = document.getElementById("valGoalText");
+    const deadlineText = document.getElementById("valDeadlineText");
+    const constraintsTags = document.getElementById("valConstraintsTags");
 
-    // Populate Clean Numbered Actions List
+    if (engineTag) engineTag.textContent = plan.source || "Autonomous Engine (Fallback Mode)";
+    if (goalText) goalText.textContent = plan.goal;
+    if (deadlineText) deadlineText.textContent = plan.deadline || "Within workflow timeline";
+
+    if (constraintsTags) {
+      const constraints = plan.constraints || [];
+      if (constraints.length > 0) {
+        constraintsTags.innerHTML = constraints.map(c => 
+          `<span class="constraint-pill">${ToolsView.escapeHtml(c)}</span>`
+        ).join("");
+      } else {
+        constraintsTags.innerHTML = `<span class="constraint-pill">Optimal sequenced focus periods</span>`;
+      }
+    }
+
+    // 2. POPULATE PLAN BLOCK
+    const effortText = document.getElementById("valEstimatedEffort");
+    const assumptionText = document.getElementById("valAssumptionText");
+    const summaryText = document.getElementById("valPlanSummary");
+    const actionsListEl = document.getElementById("valPlanActionsList");
+
+    if (effortText) effortText.textContent = plan.estimatedTime ? `⏱️ Estimated: ${plan.estimatedTime}` : "⏱️ Estimated: ~2 hours";
+    if (assumptionText) {
+      assumptionText.textContent = plan.assumption ? `• ${plan.assumption}` : "";
+    }
+    if (summaryText) summaryText.textContent = plan.summary;
+
     if (actionsListEl) {
       const actions = plan.actions || [];
       actionsListEl.innerHTML = actions.map((act, idx) => {
         const title = act.title || act.description;
         const sub = (act.title && act.description && act.title !== act.description) ? act.description : "";
+        const priority = act.priority || "medium";
+        const duration = act.estimatedDuration || "30 mins";
+
         return `
           <div class="plan-action-item">
             <span class="action-num">${idx + 1}</span>
@@ -286,55 +342,82 @@ const App = {
               <span class="action-title">${ToolsView.escapeHtml(title)}</span>
               ${sub ? `<span class="action-sub">${ToolsView.escapeHtml(sub)}</span>` : ""}
             </div>
-            ${act.requiresApproval ? `<span class="action-gate-tag" title="Consequential calendar booking">Clearance</span>` : ""}
+            <div class="action-badges">
+              <span class="priority-pill priority-${priority.toLowerCase()}">${priority}</span>
+              <span class="duration-badge">${duration}</span>
+              ${act.requiresApproval ? `<span class="action-gate-tag" title="Consequential calendar booking">Requires Approval</span>` : ""}
+            </div>
           </div>
         `;
       }).join("");
     }
 
-    // Estimated Time & Assumption
-    if (timeEl) timeEl.textContent = plan.estimatedTime || "~2 hours total";
-    if (assumptionBox && assumptionEl) {
-      if (plan.assumption) {
-        assumptionBox.style.display = "flex";
-        assumptionEl.textContent = plan.assumption;
-      } else {
-        assumptionBox.style.display = "none";
+    // 3. POPULATE APPROVAL BLOCK
+    const approvalCard = document.getElementById("approvalAlertCard");
+    const reasonText = document.getElementById("valApprovalReason");
+    const rejectedMsg = document.getElementById("approvalRejectedMessage");
+
+    if (rejectedMsg) rejectedMsg.classList.add("hidden");
+
+    const consequential = (plan.actions || []).find(a => a.requiresApproval);
+    if (consequential) {
+      if (approvalCard) approvalCard.classList.remove("hidden");
+      if (reasonText) {
+        reasonText.textContent = consequential.approvalReason || consequential.description;
       }
+      this.setStepper(3); // Stage 3: Approve
+    } else {
+      if (approvalCard) approvalCard.classList.add("hidden");
+      this.setStepper(2); // Stage 2: Plan
     }
 
-    if (primaryCard) {
-      primaryCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Smooth scroll to workflow card
+    if (workflowSection) {
+      workflowSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   },
 
   // ==========================================
-  // STAGE 2: EXECUTE PLAN
+  // STAGES 3 & 4: APPROVAL + EXECUTE
   // ==========================================
-  async handleExecutePlan() {
+  async handleApproveAndExecute() {
     if (!this.activePlan) return;
 
-    const primaryCard = document.getElementById("primaryPlanCard");
-    const progressCard = document.getElementById("executionProgressCard");
-    const pStepExecuting = document.getElementById("pstep-executing");
-    const executingText = document.getElementById("executingStepText");
+    this.setStepper(4); // Stage 4: Execute
 
-    if (primaryCard) primaryCard.classList.add("hidden");
-    if (progressCard) progressCard.classList.remove("hidden");
+    const blockExecute = document.getElementById("blockExecute");
+    const statusPill = document.getElementById("executeStatusPill");
+    const stream = document.getElementById("executeStepsStream");
+
+    if (blockExecute) blockExecute.classList.remove("hidden");
+    if (statusPill) statusPill.textContent = "Executing approved actions...";
+    if (stream) stream.innerHTML = "";
 
     const actions = this.activePlan.actions || [];
 
     try {
       for (let i = 0; i < actions.length; i++) {
         const action = actions[i];
-        if (executingText) {
-          executingText.textContent = `Executing: ${action.title || action.description}...`;
+        const title = action.title || action.description;
+
+        // Add active stream row
+        const rowId = `exec-step-${action.id || i}`;
+        if (stream) {
+          const row = document.createElement("div");
+          row.className = "exec-step-row active";
+          row.id = rowId;
+          row.innerHTML = `
+            <span class="exec-step-icon">●</span>
+            <span class="exec-step-text">Executing: ${ToolsView.escapeHtml(title)}...</span>
+          `;
+          stream.appendChild(row);
+          row.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
 
-        await this.sleep(350); // smooth readable micro-delay
+        await this.sleep(350); // smooth, human-readable execution micro-delay
 
         if (action.requiresApproval) {
-          // Automatic approval execution via Human-in-the-loop gate
+          // Authorize via Human-in-the-loop gate
           await fetch("/api/agent/approve-action", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -352,74 +435,167 @@ const App = {
         if (action.tool === "schedule") this.stats.schedule++;
         if (action.tool === "notes") this.stats.notes++;
 
+        // Update live tool state
         await this.fetchState();
-      }
 
-      // Mark step completed
-      if (pStepExecuting) {
-        pStepExecuting.className = "simple-step done";
-        pStepExecuting.innerHTML = `<span class="step-check">✓</span><span class="step-text">All actions executed</span>`;
+        // Mark stream row done
+        const rowEl = document.getElementById(rowId);
+        if (rowEl) {
+          rowEl.className = "exec-step-row done";
+          rowEl.innerHTML = `
+            <span class="exec-step-icon">✓</span>
+            <span class="exec-step-text">Completed: ${ToolsView.escapeHtml(title)}</span>
+          `;
+        }
       }
 
       await this.sleep(400);
 
-      // Transition to Mission Complete
-      this.showMissionComplete();
+      // Transition to Stage 5: Complete
+      this.showCompleteState(false);
 
     } catch (err) {
       console.error("Execution error:", err);
       alert("Execution Error: " + err.message);
-      if (primaryCard) primaryCard.classList.remove("hidden");
-      if (progressCard) progressCard.classList.add("hidden");
+    }
+  },
+
+  async handleRejectAction() {
+    if (!this.activePlan) return;
+
+    const approvalCard = document.getElementById("approvalAlertCard");
+    const rejectedMsg = document.getElementById("approvalRejectedMessage");
+    const blockExecute = document.getElementById("blockExecute");
+    const statusPill = document.getElementById("executeStatusPill");
+    const stream = document.getElementById("executeStepsStream");
+
+    const consequential = (this.activePlan.actions || []).find(a => a.requiresApproval);
+
+    if (consequential) {
+      // Record rejection securely
+      await fetch("/api/agent/approve-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionId: consequential.id, decision: "rejected" })
+      });
+    }
+
+    if (approvalCard) approvalCard.classList.add("hidden");
+    if (rejectedMsg) rejectedMsg.classList.remove("hidden");
+
+    this.setStepper(4); // Stage 4: Execute non-consequential tasks
+
+    if (blockExecute) blockExecute.classList.remove("hidden");
+    if (statusPill) statusPill.textContent = "Executing safe routine actions...";
+    if (stream) stream.innerHTML = "";
+
+    const safeActions = (this.activePlan.actions || []).filter(a => !a.requiresApproval);
+
+    try {
+      for (let i = 0; i < safeActions.length; i++) {
+        const action = safeActions[i];
+        const title = action.title || action.description;
+
+        const rowId = `exec-step-safe-${action.id || i}`;
+        if (stream) {
+          const row = document.createElement("div");
+          row.className = "exec-step-row active";
+          row.id = rowId;
+          row.innerHTML = `
+            <span class="exec-step-icon">●</span>
+            <span class="exec-step-text">Executing safe task: ${ToolsView.escapeHtml(title)}...</span>
+          `;
+          stream.appendChild(row);
+        }
+
+        await this.sleep(350);
+
+        await fetch("/api/agent/execute-action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ actionId: action.id })
+        });
+
+        if (action.tool === "task") this.stats.tasks++;
+        if (action.tool === "schedule") this.stats.schedule++;
+        if (action.tool === "notes") this.stats.notes++;
+
+        await this.fetchState();
+
+        const rowEl = document.getElementById(rowId);
+        if (rowEl) {
+          rowEl.className = "exec-step-row done";
+          rowEl.innerHTML = `
+            <span class="exec-step-icon">✓</span>
+            <span class="exec-step-text">Completed safe task: ${ToolsView.escapeHtml(title)}</span>
+          `;
+        }
+      }
+
+      await this.sleep(400);
+
+      // Transition to Stage 5: Complete (with rejection acknowledged)
+      this.showCompleteState(true);
+
+    } catch (err) {
+      console.error("Execution error on safe actions:", err);
+      alert("Execution Error: " + err.message);
     }
   },
 
   // ==========================================
-  // STAGE 3: MISSION COMPLETE
+  // STAGE 5: COMPLETE
   // ==========================================
-  showMissionComplete() {
-    const progressCard = document.getElementById("executionProgressCard");
-    const completeCard = document.getElementById("missionCompleteCard");
-    const summaryEl = document.getElementById("completeResultSummary");
+  showCompleteState(wasRejected = false) {
+    this.setStepper(5); // Stage 5: Complete
 
-    if (progressCard) progressCard.classList.add("hidden");
-    if (completeCard) {
-      completeCard.classList.remove("hidden");
-      completeCard.scrollIntoView({ behavior: "smooth", block: "center" });
+    const blockExecute = document.getElementById("blockExecute");
+    const blockComplete = document.getElementById("blockComplete");
+    const summaryEl = document.getElementById("valCompleteSummary");
+    const artifactsSummary = document.getElementById("valArtifactsSummary");
+
+    if (blockExecute) blockExecute.classList.add("hidden");
+    if (blockComplete) {
+      blockComplete.classList.remove("hidden");
+      blockComplete.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
     if (summaryEl && this.activePlan) {
-      summaryEl.textContent = `All planned actions executed successfully. ${this.activePlan.summary}`;
+      if (wasRejected) {
+        summaryEl.textContent = `Safe tasks registered successfully. Sensitive calendar booking was cancelled per your instruction.`;
+      } else {
+        summaryEl.textContent = `All approved actions executed successfully. ${this.activePlan.summary}`;
+      }
     }
 
-    // Metric pills
-    const pillTasks = document.getElementById("pillTasks");
-    const pillSchedule = document.getElementById("pillSchedule");
-    const pillNotes = document.getElementById("pillNotes");
+    if (artifactsSummary) {
+      const taskCount = this.stats.tasks || 2;
+      const schedCount = wasRejected ? 0 : (this.stats.schedule || 1);
 
-    if (pillTasks) pillTasks.textContent = `${this.stats.tasks || 2} tasks created`;
-    if (pillSchedule) pillSchedule.textContent = `${this.stats.schedule || 1} session scheduled`;
-    if (pillNotes) pillNotes.textContent = `Notes & intel saved`;
+      artifactsSummary.innerHTML = `
+        <span class="artifact-pill">📋 ${taskCount} task${taskCount === 1 ? '' : 's'} registered</span>
+        <span class="artifact-pill">📅 ${schedCount} calendar session${schedCount === 1 ? '' : 's'} ${wasRejected ? '(cancelled)' : 'booked'}</span>
+        <span class="artifact-pill">📑 Notes &amp; checklist archived</span>
+      `;
+    }
   },
 
   // ==========================================
-  // RESET / START ANOTHER
+  // RESET / START ANOTHER TASK
   // ==========================================
   resetToHomeView(clearInput = true) {
     const hero = document.getElementById("heroCenterpiece");
-    const section = document.getElementById("planCardSection");
-    const primaryCard = document.getElementById("primaryPlanCard");
-    const progressCard = document.getElementById("executionProgressCard");
-    const completeCard = document.getElementById("missionCompleteCard");
-    const drawer = document.getElementById("detailsDrawer");
+    const workflowSection = document.getElementById("workflowCardSection");
+    const blockExecute = document.getElementById("blockExecute");
+    const blockComplete = document.getElementById("blockComplete");
+    const detailsDrawer = document.getElementById("detailsDrawer");
     const input = document.getElementById("goalInput");
 
     if (hero) hero.classList.remove("hero-compact");
-    if (section) section.classList.add("hidden");
-    if (primaryCard) primaryCard.classList.add("hidden");
-    if (progressCard) progressCard.classList.add("hidden");
-    if (completeCard) completeCard.classList.add("hidden");
-    if (drawer) drawer.classList.add("hidden");
+    if (workflowSection) workflowSection.classList.add("hidden");
+    if (blockExecute) blockExecute.classList.add("hidden");
+    if (blockComplete) blockComplete.classList.add("hidden");
+    if (detailsDrawer) detailsDrawer.classList.add("hidden");
 
     if (clearInput && input) input.value = "";
     const exampleChips = document.querySelectorAll(".example-chip");
@@ -445,9 +621,14 @@ const App = {
     const container = document.getElementById("activityFeed");
     if (!container) return;
 
+    if (logs.length === 0) {
+      container.innerHTML = `<div class="empty-placeholder"><span>No activity recorded yet</span></div>`;
+      return;
+    }
+
     container.innerHTML = logs.map(log => {
       let icon = "✓";
-      if (log.type === "warning") icon = "⚠";
+      if (log.type === "warning") icon = "⚠️";
       if (log.type === "system") icon = "⚙";
 
       return `

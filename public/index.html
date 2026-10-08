@@ -3,18 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ACTIONPILOT | Autonomous AI for Getting Things Done</title>
-  <meta name="description" content="Autonomous AI personal assistant that plans, reasons, and executes everyday tasks with real tools and human oversight.">
+  <title>ACTIONPILOT | Your AI Assistant for Getting Things Done</title>
+  <meta name="description" content="Autonomous AI assistant that understands goals, creates plans, requests human approval, and executes tasks.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="dark-theme">
-  <!-- Subtle Ambient Background Gradients -->
+  <!-- Cyber Background Grid & Ambient Glows -->
   <div class="bg-fx-grid"></div>
-  <div class="bg-glow bg-glow-1"></div>
-  <div class="bg-glow bg-glow-2"></div>
 
   <!-- Minimal Header Navigation -->
   <header class="app-header">
@@ -41,10 +39,10 @@
     <div class="header-right">
       <div class="engine-badge" id="engineStatusBadge" title="Engine Status">
         <span class="engine-indicator pulse" id="enginePulse"></span>
-        <span class="engine-label" id="engineLabel">Autonomous Engine Ready</span>
+        <span class="engine-label" id="engineLabel">Autonomous Engine (Fallback Mode)</span>
       </div>
 
-      <button class="btn btn-ghost" id="btnSettings" title="Configure AI Key">
+      <button class="btn btn-ghost" id="btnSettings" title="Configure Gemini API Key">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -52,7 +50,7 @@
         <span>Settings</span>
       </button>
 
-      <button class="btn btn-ghost" id="btnResetState" title="Reset Workspace">
+      <button class="btn btn-ghost" id="btnResetState" title="Reset Workspace to Clean State">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="23 4 23 10 17 10"></polyline>
           <polyline points="1 20 1 14 7 14"></polyline>
@@ -66,31 +64,40 @@
   <!-- Main Container -->
   <main class="app-layout">
 
-    <!-- 1. GOAL INPUT CENTERPIECE (5-Second First Impression) -->
+    <!-- HERO SECTION WITH PREMIUM AI AURORA ANIMATION -->
     <section class="hero-centerpiece" id="heroCenterpiece">
+      <!-- Premium Animated AI Aurora Background -->
+      <div class="hero-aurora-bg" aria-hidden="true">
+        <div class="aurora-blob aurora-blob-cyan"></div>
+        <div class="aurora-blob aurora-blob-blue"></div>
+        <div class="aurora-blob aurora-blob-purple"></div>
+        <div class="aurora-blob aurora-blob-violet"></div>
+      </div>
+
       <div class="hero-content">
-        <div class="hero-pill-tag">
-          <span class="pill-spark">⚡</span>
-          Autonomous AI Agent
+        <div class="hero-brand-eyebrow">
+          <span class="eyebrow-dot"></span>
+          ACTIONPILOT
         </div>
 
-        <h1 class="hero-headline">Tell ActionPilot what you want to get done.</h1>
-        <p class="hero-subtext">Autonomous AI assistant that plans, reasons, and executes everyday tasks with human oversight.</p>
+        <h1 class="hero-headline">Your AI assistant for getting things done.</h1>
+        <p class="hero-subtext">Turn everyday goals into structured actions. ActionPilot understands your intent, generates actionable plans, requests human approval, and executes.</p>
 
         <!-- Command Input Box -->
         <div class="command-input-wrapper">
           <div class="input-glow-frame" id="inputFrame">
             <div class="input-icon-lead">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
               </svg>
             </div>
             <textarea 
               id="goalInput" 
               class="goal-textarea" 
               rows="2" 
-              placeholder="e.g. Plan my study schedule for next week..."
+              placeholder="e.g. Prepare my presentation for tomorrow"
               spellcheck="false"
             ></textarea>
             <div class="input-actions">
@@ -104,20 +111,20 @@
           </div>
         </div>
 
-        <!-- 3 Prominent Example Prompts -->
+        <!-- Helpful Example Prompts (Clearly Labeled) -->
         <div class="example-prompts-container">
-          <span class="example-prompts-label">Try an example:</span>
+          <span class="example-prompts-label">Example Prompts:</span>
           <div class="example-chips">
-            <button class="example-chip" data-goal="Plan my study schedule for next week">
-              <span class="chip-dot"></span>
-              <span>Plan my study schedule for next week</span>
-            </button>
             <button class="example-chip" data-goal="Prepare my presentation for tomorrow">
-              <span class="chip-dot"></span>
+              <span class="chip-spark">✨</span>
               <span>Prepare my presentation for tomorrow</span>
             </button>
+            <button class="example-chip" data-goal="Plan my study schedule for next week">
+              <span class="chip-spark">📚</span>
+              <span>Plan my study schedule for next week</span>
+            </button>
             <button class="example-chip" data-goal="Organize my assignments before Friday">
-              <span class="chip-dot"></span>
+              <span class="chip-spark">📋</span>
               <span>Organize my assignments before Friday</span>
             </button>
           </div>
@@ -125,124 +132,161 @@
       </div>
     </section>
 
-    <!-- 2. PRIMARY RESULT CARD: "Here's your plan" (Single Clean Card) -->
-    <section class="plan-card-section hidden" id="planCardSection">
-      <div class="primary-plan-card glass-panel" id="primaryPlanCard">
-        
-        <div class="plan-card-header">
-          <div class="plan-card-top-row">
-            <span class="plan-eyebrow">
-              <span class="eyebrow-spark">⚡</span>
-              AI WORKFLOW PLAN
-            </span>
-            <span class="plan-source-pill" id="planSourcePill">Autonomous Engine</span>
+    <!-- AI AGENT WORKFLOW CONTAINER (UNDERSTAND -> PLAN -> APPROVE -> EXECUTE -> COMPLETE) -->
+    <section class="workflow-card-section hidden" id="workflowCardSection">
+
+      <!-- 5-Stage Stepper Header -->
+      <div class="workflow-stepper-bar">
+        <div class="stepper-step active" id="step-understand">
+          <span class="stepper-dot">1</span>
+          <span class="stepper-label">Understand</span>
+        </div>
+        <div class="stepper-divider" id="sdiv-1"></div>
+        <div class="stepper-step" id="step-plan">
+          <span class="stepper-dot">2</span>
+          <span class="stepper-label">Plan</span>
+        </div>
+        <div class="stepper-divider" id="sdiv-2"></div>
+        <div class="stepper-step" id="step-approve">
+          <span class="stepper-dot">3</span>
+          <span class="stepper-label">Approve</span>
+        </div>
+        <div class="stepper-divider" id="sdiv-3"></div>
+        <div class="stepper-step" id="step-execute">
+          <span class="stepper-dot">4</span>
+          <span class="stepper-label">Execute</span>
+        </div>
+        <div class="stepper-divider" id="sdiv-4"></div>
+        <div class="stepper-step" id="step-complete">
+          <span class="stepper-dot">5</span>
+          <span class="stepper-label">Complete</span>
+        </div>
+      </div>
+
+      <!-- MAIN AGENT WORKFLOW CARD -->
+      <div class="agent-workflow-card glass-panel" id="agentWorkflowCard">
+
+        <!-- A. UNDERSTAND BLOCK -->
+        <div class="workflow-block understand-block" id="blockUnderstand">
+          <div class="block-header">
+            <span class="block-tag">UNDERSTAND</span>
+            <span class="block-engine-tag" id="engineSourceTag">Autonomous Engine (Fallback Mode)</span>
           </div>
 
-          <h2 class="plan-title">Here's your plan</h2>
+          <div class="understand-grid">
+            <div class="understand-item goal-item">
+              <span class="field-label">User Goal</span>
+              <p class="field-val" id="valGoalText">Prepare my presentation for tomorrow</p>
+            </div>
+            <div class="understand-item deadline-item">
+              <span class="field-label">Detected Deadline</span>
+              <p class="field-val highlight-deadline" id="valDeadlineText">Tomorrow</p>
+            </div>
+            <div class="understand-item constraints-item">
+              <span class="field-label">Important Constraints</span>
+              <div class="constraints-tags" id="valConstraintsTags">
+                <span class="constraint-pill">Complete visual aids before rehearsal</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <div class="plan-goal-chip">
-            <span class="goal-chip-label">Goal:</span>
-            <span class="goal-chip-text" id="displayGoalText">Prepare my presentation for tomorrow</span>
+        <!-- B. PLAN BLOCK -->
+        <div class="workflow-block plan-block" id="blockPlan">
+          <div class="block-header">
+            <span class="block-tag">PLAN</span>
+            <div class="plan-meta-summary">
+              <span class="meta-effort" id="valEstimatedEffort">⏱️ Estimated: 2 hours</span>
+              <span class="meta-assumption" id="valAssumptionText"></span>
+            </div>
           </div>
 
-          <p class="plan-summary-text" id="displaySummaryText">
+          <p class="plan-overview-text" id="valPlanSummary">
             Organized your presentation workflow into 3 focused stages: outline creation, slide review, and a dedicated rehearsal block.
           </p>
-        </div>
 
-        <!-- Numbered list of 3-5 relevant actions -->
-        <div class="plan-actions-container">
-          <span class="actions-header-label">Planned Actions:</span>
-          <div class="plan-actions-list" id="displayActionsList">
-            <!-- Dynamically populated numbered actions -->
+          <div class="plan-actions-list" id="valPlanActionsList">
+            <!-- Dynamically populated action items -->
           </div>
         </div>
 
-        <!-- Meta row: Estimated time & Important assumption -->
-        <div class="plan-meta-row" id="planMetaRow">
-          <div class="plan-meta-item">
-            <span class="meta-label">⏱️ Estimated Time:</span>
-            <span class="meta-val" id="displayEstimatedTime">~2 hours total</span>
+        <!-- C. APPROVAL BLOCK -->
+        <div class="workflow-block approval-block" id="blockApproval">
+          <div class="approval-alert-card" id="approvalAlertCard">
+            <div class="approval-lead">
+              <div class="approval-icon">⚠️</div>
+              <div class="approval-info">
+                <span class="approval-headline">HUMAN APPROVAL REQUIRED</span>
+                <p class="approval-reason-text" id="valApprovalReason">
+                  Adding a new 60-minute rehearsal block to your calendar tomorrow at 02:00 PM.
+                </p>
+              </div>
+            </div>
+            <div class="approval-controls">
+              <button class="btn btn-reject" id="btnRejectAction">
+                <span>Reject</span>
+              </button>
+              <button class="btn btn-approve-execute" id="btnApproveAction">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Approve &amp; Execute</span>
+              </button>
+            </div>
           </div>
-          <div class="plan-meta-item" id="metaAssumptionBox">
-            <span class="meta-label">ℹ️ Important Note:</span>
-            <span class="meta-val" id="displayAssumption">Rehearsal scheduled for tomorrow afternoon.</span>
+
+          <div class="approval-rejected-message hidden" id="approvalRejectedMessage">
+            <span>Action rejected by user. Safe tasks will continue without calendar mutation.</span>
           </div>
         </div>
 
-        <!-- Primary CTA Button -->
-        <div class="plan-card-footer">
-          <button class="btn btn-secondary" id="btnCancelPlan">
-            <span>Cancel</span>
-          </button>
-          <button class="btn btn-primary btn-approve-execute" id="btnApproveAndExecute">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            <span>Approve &amp; Execute</span>
-          </button>
+        <!-- D. EXECUTE BLOCK (Visible during execution) -->
+        <div class="workflow-block execute-block hidden" id="blockExecute">
+          <div class="block-header">
+            <span class="block-tag">EXECUTE</span>
+            <span class="execute-status-pill" id="executeStatusPill">Running Approved Actions...</span>
+          </div>
+
+          <div class="execute-steps-stream" id="executeStepsStream">
+            <!-- Progress steps stream -->
+          </div>
+        </div>
+
+        <!-- E. COMPLETE BLOCK (Clean success state) -->
+        <div class="workflow-block complete-block hidden" id="blockComplete">
+          <div class="complete-hero-box">
+            <div class="complete-ring">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <h3 class="complete-headline">Workflow Executed Successfully</h3>
+            <p class="complete-summary-text" id="valCompleteSummary">
+              All approved actions executed. Schedule updated, tasks registered, and notes saved.
+            </p>
+
+            <div class="complete-artifacts-summary" id="valArtifactsSummary">
+              <!-- Summary pills of real created items -->
+            </div>
+
+            <div class="complete-btn-row">
+              <button class="btn btn-secondary" id="btnToggleDetails">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <span id="toggleDetailsBtnText">View Created Items</span>
+              </button>
+              <button class="btn btn-primary" id="btnStartNewGoal">
+                <span>Start Another Task</span>
+              </button>
+            </div>
+          </div>
         </div>
 
       </div>
 
-      <!-- 3. ANIMATED EXECUTION PROGRESS STATE -->
-      <div class="execution-progress-card glass-panel hidden" id="executionProgressCard">
-        <div class="progress-hero">
-          <div class="core-orbit core-orbit-mini"></div>
-          <h3 class="progress-headline" id="progressHeadline">Executing actions...</h3>
-        </div>
-
-        <div class="simple-progress-steps" id="simpleProgressSteps">
-          <div class="simple-step done" id="pstep-plan">
-            <span class="step-check">✓</span>
-            <span class="step-text">Plan created</span>
-          </div>
-          <div class="simple-step done" id="pstep-approval">
-            <span class="step-check">✓</span>
-            <span class="step-text">Approval received</span>
-          </div>
-          <div class="simple-step active" id="pstep-executing">
-            <span class="step-dot pulse">●</span>
-            <span class="step-text" id="executingStepText">Executing actions...</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4. MISSION COMPLETE CARD -->
-      <div class="mission-complete-card glass-panel hidden" id="missionCompleteCard">
-        <div class="complete-hero">
-          <div class="complete-badge-ring">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </div>
-          <h2 class="complete-title">Mission Complete</h2>
-          <p class="complete-summary" id="completeResultSummary">
-            All planned actions executed successfully with tool coordination and human oversight.
-          </p>
-
-          <div class="complete-metrics-pills">
-            <span class="metric-pill" id="pillTasks">Tasks created</span>
-            <span class="metric-pill" id="pillSchedule">Session scheduled</span>
-            <span class="metric-pill" id="pillNotes">Notes archived</span>
-          </div>
-        </div>
-
-        <div class="complete-actions">
-          <button class="btn btn-secondary" id="btnToggleDetails">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-            </svg>
-            <span id="toggleDetailsBtnText">View Details</span>
-          </button>
-          <button class="btn btn-primary" id="btnStartAnother">
-            <span>Start Another Task</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- 5. EXPANDABLE SECONDARY DETAILS DRAWER (Preserves all underlying tools & depth) -->
+      <!-- SECONDARY EXPANDABLE DETAILS DRAWER -->
       <div class="expandable-details-drawer glass-panel hidden" id="detailsDrawer">
         <div class="drawer-header">
           <div class="drawer-title">
@@ -251,7 +295,7 @@
               <polyline points="2 17 12 22 22 17"></polyline>
               <polyline points="2 12 12 17 22 12"></polyline>
             </svg>
-            <span>Underlying Agent State &amp; Tool Registry</span>
+            <span>Live Tool Registry &amp; Created Items</span>
           </div>
           <button class="btn-text-action" id="btnCloseDetails">&times; Close</button>
         </div>
@@ -338,7 +382,7 @@
           </div>
           <div class="spec-row">
             <span class="spec-key">Core Model:</span>
-            <span class="spec-val">Google Gemini 2.5 Flash / Autonomous Fallback</span>
+            <span class="spec-val">Google Gemini 2.5 Flash / Fallback Engine</span>
           </div>
           <div class="spec-row">
             <span class="spec-key">Connected Tools:</span>
