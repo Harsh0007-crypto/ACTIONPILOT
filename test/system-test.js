@@ -42,13 +42,13 @@ async function runTests() {
     assert.strictEqual(health.json.status, "ok", "Status should be ok");
     console.log("✓ Health endpoint returned healthy JSON:", health.json);
 
-    // TEST 2: Initial State
-    console.log("\n[TEST 2] Checking GET /api/state...");
+    // TEST 2: Initial State (Clean workspace, no preloaded tasks)
+    console.log("\n[TEST 2] Checking GET /api/state (verifying clean initial workspace)...");
     const state = await api("/api/state");
     assert.strictEqual(state.status, 200);
-    assert.ok(state.json.data.tasks.length > 0, "Seed tasks should be present");
-    assert.ok(state.json.data.schedule.length > 0, "Seed schedule should be present");
-    console.log(`✓ Initial state loaded: ${state.json.data.tasks.length} tasks, ${state.json.data.schedule.length} schedule events`);
+    assert.strictEqual(state.json.data.tasks.length, 0, "Initial tasks should be empty for a clean fresh workspace");
+    assert.ok(state.json.data.schedule.length > 0, "Seed schedule for conflict detection should be present");
+    console.log(`✓ Clean initial state verified: 0 preloaded tasks, ${state.json.data.schedule.length} schedule events`);
 
     // TEST 3: Scenario 1 - Presentation Prep Planning
     console.log("\n[TEST 3] Planning Goal: 'Plan my preparation for tomorrow's presentation around my existing tasks.'");
@@ -132,8 +132,16 @@ async function runTests() {
     console.log(`✓ Rejection recorded safely. Action marked rejected without unintended mutation.`);
 
     // TEST 9: Manual Task Status Toggle
-    console.log("\n[TEST 9] Testing task status toggle endpoint...");
+    console.log("\n[TEST 9] Testing task creation and status toggle endpoint...");
+    const taskAction = plan2.json.plan.actions.find(a => a.tool === "task" && a.action === "create");
+    assert.ok(taskAction, "Plan 2 should have task creation action");
+    await api("/api/agent/execute-action", {
+      method: "POST",
+      body: JSON.stringify({ actionId: taskAction.id })
+    });
+
     const currentTasks = (await api("/api/state")).json.data.tasks;
+    assert.ok(currentTasks.length > 0, "Created task should exist in registry");
     const testTask = currentTasks[0];
     const toggleResp = await api(`/api/tasks/${testTask.id}/status`, {
       method: "POST",
@@ -141,7 +149,7 @@ async function runTests() {
     });
     assert.strictEqual(toggleResp.status, 200);
     assert.strictEqual(toggleResp.json.task.status, "completed");
-    console.log(`✓ Task status toggle works.`);
+    console.log(`✓ Task created and status toggle verified.`);
 
     // TEST 10: State Reset
     console.log("\n[TEST 10] Testing state reset...");

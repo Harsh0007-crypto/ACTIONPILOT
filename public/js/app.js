@@ -1,7 +1,7 @@
 /**
  * ActionPilot Main Application Controller
- * Orchestrates user interactions, agent execution pipeline, human oversight gates,
- * and live synchronization with backend tools.
+ * Progressive disclosure architecture:
+ * Clean 5-second first impression on initial load -> Progressive AI orchestration upon planning.
  */
 
 const App = {
@@ -24,13 +24,13 @@ const App = {
   },
 
   bindEvents() {
-    // Run Agent Button
+    // Run / Plan with AI Button
     const btnRun = document.getElementById("btnRunAgent");
     if (btnRun) {
       btnRun.addEventListener("click", () => this.handleRunAgent());
     }
 
-    // Goal Enter key handler (Shift+Enter for newline)
+    // Goal Input Enter key (Shift+Enter for newline)
     const goalInput = document.getElementById("goalInput");
     if (goalInput) {
       goalInput.addEventListener("keydown", (e) => {
@@ -41,25 +41,32 @@ const App = {
       });
     }
 
-    // Demo Scenario Chips (Populate without auto-executing per hackathon guidelines)
-    const demoChips = document.querySelectorAll(".demo-chip");
-    demoChips.forEach(chip => {
+    // Example Prompts (Click populates input without auto-running per guidelines)
+    const exampleChips = document.querySelectorAll(".example-chip");
+    exampleChips.forEach(chip => {
       chip.addEventListener("click", () => {
         const goalText = chip.getAttribute("data-goal");
         if (goalInput && goalText) {
           goalInput.value = goalText;
           goalInput.focus();
-          // Visual highlight
-          demoChips.forEach(c => c.style.borderColor = "var(--border-subtle)");
-          chip.style.borderColor = "var(--neon-cyan)";
-          setTimeout(() => {
-            chip.style.borderColor = "";
-          }, 1500);
+
+          // Elegant visual pulse on selected chip
+          exampleChips.forEach(c => c.classList.remove("selected"));
+          chip.classList.add("selected");
         }
       });
     });
 
-    // Human-in-the-Loop Approval Buttons
+    // Brand link resets or scrolls to top
+    const brandHomeLink = document.getElementById("brandHomeLink");
+    if (brandHomeLink) {
+      brandHomeLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+
+    // Human-in-the-Loop Approval Decision Buttons
     const btnApprove = document.getElementById("btnApproveAction");
     const btnReject = document.getElementById("btnRejectAction");
     if (btnApprove) {
@@ -69,7 +76,7 @@ const App = {
       btnReject.addEventListener("click", () => this.handleApprovalDecision("rejected"));
     }
 
-    // Reset State
+    // Reset State & Workspace
     const btnReset = document.getElementById("btnResetState");
     if (btnReset) {
       btnReset.addEventListener("click", () => this.handleResetState());
@@ -135,8 +142,11 @@ const App = {
     if (btnViewActivityFeed && completionModal) {
       btnViewActivityFeed.addEventListener("click", () => {
         completionModal.classList.add("hidden");
-        const actPanel = document.getElementById("activityPanel");
-        if (actPanel) actPanel.scrollIntoView({ behavior: "smooth" });
+        // Switch to activity tab in secondary panel
+        const actTabBtn = document.querySelector('[data-tab="tab-activity"]');
+        if (actTabBtn) actTabBtn.click();
+        const secPanel = document.querySelector(".secondary-tools-panel");
+        if (secPanel) secPanel.scrollIntoView({ behavior: "smooth" });
       });
     }
   },
@@ -154,7 +164,7 @@ const App = {
       );
     } catch (err) {
       console.warn("Health check error:", err);
-      this.updateEngineBadge(false, "Offline / Autonomous Fallback");
+      this.updateEngineBadge(false, "Autonomous Fallback Ready");
     }
   },
 
@@ -189,58 +199,33 @@ const App = {
         ToolsView.render(json.data);
         this.renderActivityFeed(json.data.activityLog || []);
       }
+
       this.activePlan = null;
       this.currentActionIndex = 0;
       this.stats = { tasks: 0, schedule: 0, approved: 0, rejected: 0 };
       WorkflowManager.reset();
-      this.resetReasoningView();
-      this.resetActionsView();
+
+      // Hide workspace and return to pristine clean home state
+      const workspace = document.getElementById("agentWorkspace");
+      if (workspace) workspace.classList.add("hidden");
+
+      const input = document.getElementById("goalInput");
+      if (input) input.value = "";
+
+      const exampleChips = document.querySelectorAll(".example-chip");
+      exampleChips.forEach(c => c.classList.remove("selected"));
+
       const approvalCard = document.getElementById("approvalCardWrapper");
       if (approvalCard) approvalCard.classList.add("hidden");
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       alert("Failed to reset state: " + err.message);
     }
   },
 
-  resetReasoningView() {
-    const intentText = document.getElementById("intentText");
-    const urgencyPill = document.getElementById("urgencyPill");
-    const constraintsList = document.getElementById("constraintsList");
-    const reasoningText = document.getElementById("reasoningText");
-    const sourceBadge = document.getElementById("sourceBadge");
-
-    if (intentText) intentText.textContent = "Input a goal or select a scenario above. ActionPilot will decompose requirements, parse deadlines, and construct an execution plan.";
-    if (urgencyPill) {
-      urgencyPill.textContent = "Ready";
-      urgencyPill.className = "urgency-pill";
-    }
-    if (constraintsList) {
-      constraintsList.innerHTML = `<li class="empty-state-hint">Constraints will be extracted automatically upon goal analysis.</li>`;
-    }
-    if (reasoningText) {
-      reasoningText.textContent = "Awaiting directive. Once analyzed, ActionPilot will display step-by-step reasoning logic and tool orchestration strategy here.";
-    }
-    if (sourceBadge) sourceBadge.textContent = "Autonomous Engine";
-  },
-
-  resetActionsView() {
-    const list = document.getElementById("actionsList");
-    const badge = document.getElementById("actionCountBadge");
-    if (badge) badge.textContent = "0 Steps";
-    if (list) {
-      list.innerHTML = `
-        <div class="empty-placeholder">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-          </svg>
-          <span>No action pipeline generated yet</span>
-        </div>`;
-    }
-  },
-
   // ==========================================
-  // AGENT RUN ORCHESTRATION
+  // PROGRESSIVE AGENT EXECUTION
   // ==========================================
   async handleRunAgent() {
     const input = document.getElementById("goalInput");
@@ -248,8 +233,11 @@ const App = {
 
     if (!goal) {
       input.focus();
-      input.classList.add("shake");
-      setTimeout(() => input.classList.remove("shake"), 500);
+      const inputFrame = document.getElementById("inputFrame");
+      if (inputFrame) {
+        inputFrame.classList.add("shake");
+        setTimeout(() => inputFrame.classList.remove("shake"), 400);
+      }
       return;
     }
 
@@ -261,10 +249,18 @@ const App = {
     // Reset stats
     this.stats = { tasks: 0, schedule: 0, approved: 0, rejected: 0 };
 
+    // Reveal Progressive Agent Workspace
+    const workspace = document.getElementById("agentWorkspace");
+    if (workspace) {
+      workspace.classList.remove("hidden");
+      // Smooth scroll down to workspace
+      workspace.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     try {
       // 1. UNDERSTAND STAGE
       WorkflowManager.setStage("understand", "active");
-      WorkflowManager.setProgress(15, "Parsing Goal & Intent...");
+      WorkflowManager.setProgress(20, "Analyzing Intent & Constraints...");
       await this.sleep(400);
 
       const customKey = sessionStorage.getItem("custom_gemini_key") || null;
@@ -284,23 +280,18 @@ const App = {
 
       // 2. PLAN STAGE
       WorkflowManager.setStage("plan", "active");
-      WorkflowManager.setProgress(35, "Decomposing Tasks & Dependencies...");
+      WorkflowManager.setProgress(45, "Decomposing Tasks & Tool Actions...");
       this.renderReasoning(this.activePlan);
-      await this.sleep(450);
-
-      // 3. TOOLS STAGE
-      WorkflowManager.setStage("tools", "active");
-      WorkflowManager.setProgress(50, "Binding Tool Actions...");
       this.renderActions(this.activePlan.actions);
       await this.sleep(450);
 
-      // 4 & 5. EXECUTION PIPELINE WITH HUMAN APPROVAL GATE
+      // 3 & 4. APPROVE & EXECUTE PIPELINE
       await this.executeActionPipeline(this.activePlan.actions);
 
-      // 6. COMPLETE STAGE
-      WorkflowManager.setStage("complete", "completed");
+      // 5. DONE STAGE
+      WorkflowManager.setStage("done", "completed");
       WorkflowManager.setProgress(100, "Mission Accomplished");
-      await this.sleep(300);
+      await this.sleep(350);
 
       this.showCompletionModal(this.activePlan);
 
@@ -311,7 +302,7 @@ const App = {
       alert("Agent Execution Error: " + err.message);
     } finally {
       if (btnRun) btnRun.classList.remove("is-running");
-      if (runText) runText.textContent = "Run Agent";
+      if (runText) runText.textContent = "Plan with AI";
     }
   },
 
@@ -320,15 +311,15 @@ const App = {
       const action = actions[i];
       this.currentActionIndex = i;
 
-      const progressPct = 50 + Math.round(((i + 1) / actions.length) * 45);
+      const progressPct = 45 + Math.round(((i + 1) / actions.length) * 50);
 
       if (action.requiresApproval && action.status !== "approved") {
-        // Pauses for Human Approval!
-        WorkflowManager.setStage("approval", "paused");
+        // Pauses at APPROVE stage!
+        WorkflowManager.setStage("approve", "paused");
         WorkflowManager.setProgress(progressPct, "Paused: Operator Approval Required");
         this.updateActionCardStatus(action.id, "awaiting");
 
-        // Show approval card and await user decision
+        // Surface approval card and await operator decision
         const decision = await this.promptApproval(action);
 
         if (decision === "rejected") {
@@ -336,7 +327,7 @@ const App = {
           this.updateActionCardStatus(action.id, "rejected");
           await this.fetchState();
           await this.sleep(350);
-          continue; // Safely proceed to next actions!
+          continue; // Proceed safely to remaining steps!
         } else {
           this.stats.approved++;
           this.updateActionCardStatus(action.id, "executed");
@@ -348,12 +339,12 @@ const App = {
         }
       }
 
-      // Non-consequential safe action
+      // Routine non-consequential execution
       WorkflowManager.setStage("execute", "active");
       WorkflowManager.setProgress(progressPct, `Executing: ${action.tool}.${action.action}`);
       this.updateActionCardStatus(action.id, "running");
 
-      await this.sleep(300); // realistic micro-delay
+      await this.sleep(320); // Smooth realistic pacing
 
       const execResp = await fetch("/api/agent/execute-action", {
         method: "POST",
@@ -371,7 +362,7 @@ const App = {
       if (action.tool === "schedule") this.stats.schedule++;
 
       await this.fetchState();
-      await this.sleep(300);
+      await this.sleep(280);
     }
   },
 
@@ -448,7 +439,7 @@ const App = {
 
     if (constraintsList && plan.understanding && Array.isArray(plan.understanding.constraints)) {
       if (plan.understanding.constraints.length === 0) {
-        constraintsList.innerHTML = `<li class="empty-state-hint">No binding time constraints detected.</li>`;
+        constraintsList.innerHTML = `<li class="empty-state-hint">No binding time conflicts detected.</li>`;
       } else {
         constraintsList.innerHTML = plan.understanding.constraints.map(c => `
           <li class="constraint-item">
@@ -474,7 +465,7 @@ const App = {
     if (!actions || actions.length === 0) {
       list.innerHTML = `
         <div class="empty-placeholder">
-          <span>No action steps in pipeline</span>
+          <span>No action steps queued</span>
         </div>`;
       return;
     }

@@ -22,93 +22,48 @@ Most conversational AI assistants are passive text generators: they respond to m
 
 ---
 
-## 🔄 The 10-Step Autonomous Agent Workflow
+## 🔄 The Progressive AI Workflow
+
+A judge understands what ActionPilot does within 5 seconds. The homepage is centered on one clear question:  
+**"Tell ActionPilot what you want to get done."**
+
+After submitting a goal, ActionPilot reveals the execution pipeline progressively:
 
 ```
- USER GOAL ("I have a presentation tomorrow, two assignments due Friday, and an exam Monday...")
-    │
-    ▼
-[ 1. UNDERSTAND ] ─── Parses intent, urgency level, and hard constraints
-    │
-    ▼
-[ 2. PLAN ] ──────── Breaks goal into discrete, prioritized tasks with time estimates
-    │
-    ▼
-[ 3. SELECT TOOLS ] ─ Maps each milestone to Task, Schedule, Notes, or Info tools
-    │
-    ▼
-[ 4. DETECT CONFLICTS ] ── Audits current calendar against existing commitments
-    │
-    ▼
-[ 5. HUMAN APPROVAL GATE ] ── Pauses execution on consequential actions (e.g. moving external meetings)
-    │                  ┌───────────────┴───────────────┐
-    │                  ▼                               ▼
-    │           [ APPROVED ✓ ]                  [ REJECTED ✕ ]
-    │           Executes mutation               Safely skips mutation & adapts
-    │                  └───────────────┬───────────────┘
-    ▼                                  │
-[ 6. EXECUTE ACTIONS ] ────────────────┘
-    │   - Creates Tasks in registry
-    │   - Books de-conflicted Calendar focus blocks
-    │   - Synthesizes Intel Dossier & Briefings in Notes
-    │
-    ▼
-[ 7. AUDIT LOGGING ] ── Streams real-time telemetric activity to live feed
-    │
-    ▼
-[ 8. MISSION COMPLETE ] ─ Renders outcome analytics, metrics, and executive summary
+  [ 1. UNDERSTAND ] ── Parses intent, urgency level, and hard constraints
+          │
+          ▼
+  [ 2. PLAN ] ──────── Breaks goal into discrete, prioritized tasks and tool actions
+          │
+          ▼
+  [ 3. APPROVE ] ───── Halts on consequential actions for Human-in-the-Loop oversight
+       ┌──┴──┐
+       ▼     ▼
+    [YES]  [NO]
+       └──┬──┘
+          ▼
+  [ 4. EXECUTE ] ───── Executes approved tasks, calendar blocks, and research notes
+          │
+          ▼
+  [ 5. DONE ] ──────── Delivers executive debrief and outcome metrics
 ```
 
----
-
-## 🛡️ Human-In-The-Loop (HITL) Oversight
-
-A major judging criterion for autonomous agents is **safety and governance**. Full autonomy without guardrails leads to accidental disruption (e.g. silently moving an external client sync or deleting critical tasks).
-
-ACTIONPILOT implements a strict **two-tier execution model**:
-- **Routine Non-Destructive Actions** (`requiresApproval: false`): Creating draft tasks, compiling briefing notes, and booking unreserved focus time execute automatically.
-- **Consequential Actions** (`requiresApproval: true`): Rescheduling established calendar events, altering commitments with third parties, or resolving schedule clashes **halt the execution pipeline immediately**.
-
-### The Approval Experience:
-1. The Agent visualizer shifts to **Amber Warning Alert** (`WAITING FOR HUMAN APPROVAL`).
-2. An interactive high-contrast **Approval Card** surfaces displaying:
-   - **Proposed Action**: e.g., `Reschedule 'Client Progress Review' from 02:00 PM to 04:30 PM`
-   - **Reason**: `Moving an existing external stakeholder meeting disrupts confirmed calendar invites.`
-   - **Anticipated Impact**: `Frees up a prime 2-hour uninterrupted rehearsal block from 01:30 PM to 03:30 PM tomorrow.`
-3. The user can either:
-   - **`[ APPROVE & EXECUTE ]`**: Authorizes the consequential mutation. The tool executes immediately, updates calendar state, and logs the authorization.
-   - **`[ REJECT ACTION ]`**: Denies the mutation. The agent notes the operator veto in the activity log and proceeds safely with remaining non-dependent steps without breaking the workflow.
+Advanced technical state (Tasks Created, Calendar Schedule with Conflict Alerts, Notes Dossier, and Live Activity Log) are preserved cleanly inside secondary inspection tabs that appear after planning.
 
 ---
 
-## 🛠️ The 4 Functional Internal Tools
+## 🎬 3 Instant Example Prompts
 
-ACTIONPILOT does not use static mockups or fake buttons. All tools execute against the server-side tool registry and update live state:
+The UI includes 3 small, sleek example prompts that judges can click directly:
 
-| Tool | Operations | Real-World Behavior in ACTIONPILOT |
-| :--- | :--- | :--- |
-| 📋 **Task Tool** | `create`, `update`, `complete`, `list` | Decomposes goals into tasks with priority badges (`HIGH`, `MEDIUM`, `LOW`), durations, and interactive completion checkboxes. |
-| 📅 **Schedule Tool** | `create`, `move`, `detectConflicts`, `list` | Books dedicated focus sprints and study blocks. Calculates minute-level time overlap and flags conflicts in amber. |
-| 📝 **Notes Tool** | `create`, `read`, `list` | Compiles detailed checklists, formula cheat-sheets, and rehearsal guidelines with hashtag categorization. |
-| 💡 **Information Synthesizer** | `synthesize` | Generates structured domain frameworks and briefing dossiers tailored to the user's specific objective. |
+1. **"Plan my study schedule for next week"**  
+   *Analyzes multi-deadline dependencies, establishes spaced-repetition study blocks, and generates formula cheat-sheets.*
 
----
+2. **"Prepare my presentation for tomorrow"**  
+   *Detects an afternoon calendar conflict with an external sync, requests Human Approval to shift it to 4:30 PM, creates a dedicated 2-hour rehearsal window, and compiles a slide briefing.*
 
-## 🎬 3 Interactive Judge Demo Scenarios
-
-The UI includes 3 one-click scenario chips (clicking populates the goal input for judge review without premature auto-firing):
-
-1. **🎯 Presentation Prep**
-   > *"Plan my preparation for tomorrow's presentation around my existing tasks."*  
-   > **Agent Behavior**: Detects a crowded afternoon calendar with an existing 2:00 PM stakeholder sync. Proposes shifting the meeting to 4:30 PM (gated with Human Approval) to create a continuous 2-hour morning dry-run rehearsal block. Synthesizes an executive slide briefing in Notes.
-
-2. **📚 Math & Exam Plan**
-   > *"I have a maths assignment due Friday and an exam Monday. Create a study plan."*  
-   > **Agent Behavior**: Analyzes multi-deadline dependencies. Phases workload into Phase 1 (problem sets due Friday evening) and Phase 2 (weekend mock exam pacing). Detects Friday group study overlap and requests approval to shift buffer time.
-
-3. **⚡ Conflict Resolver**
-   > *"I need to organize my tasks for tomorrow and resolve any scheduling conflicts."*  
-   > **Agent Behavior**: Audits current day slots, eliminates fragmented 30-minute gaps, isolates peak focus hours (11:00 AM - 1:00 PM), and re-aligns non-urgent meetings.
+3. **"Organize my assignments before Friday"**  
+   *Decomposes assignment deliverables, resolves fragmented time gaps, and books protected focus sprints.*
 
 ---
 

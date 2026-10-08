@@ -1,20 +1,19 @@
 /**
  * ActionPilot Workflow & AI Core Visualizer
- * Coordinates sequential stage animation:
- * UNDERSTAND -> PLAN -> TOOLS -> APPROVAL -> EXECUTE -> COMPLETE
- * And Holographic AI Core telemetry states.
+ * Coordinates sequential 5-stage progression:
+ * 1. UNDERSTAND -> 2. PLAN -> 3. APPROVE -> 4. EXECUTE -> 5. DONE
+ * Along with Holographic AI Core visualizer & telemetry.
  */
 
-const STAGES = ["understand", "plan", "tools", "approval", "execute", "complete"];
+const STAGES = ["understand", "plan", "approve", "execute", "done"];
 
 const STATUS_TEXTS = {
   idle: "AWAITING GOAL DIRECTIVE",
   understand: "UNDERSTANDING GOAL INTENT",
-  plan: "PLANNING WORKFLOW DECOMPOSITION",
-  tools: "SELECTING AGENTIC TOOLS",
-  approval: "WAITING FOR HUMAN APPROVAL",
+  plan: "PLANNING WORKFLOW & TOOLS",
+  approve: "WAITING FOR HUMAN APPROVAL",
   execute: "EXECUTING AUTHORIZED ACTIONS",
-  complete: "MISSION COMPLETE",
+  done: "MISSION COMPLETE",
   failed: "EXECUTION HALTED / ERROR"
 };
 
@@ -34,7 +33,7 @@ const WorkflowManager = {
       }
     });
 
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 4; i++) {
       const line = document.getElementById(`line-${i}`);
       if (line) {
         line.classList.remove("completed");
@@ -77,11 +76,11 @@ const WorkflowManager = {
 
     if (state === "paused") {
       this.setCoreState("warning");
-    } else if (stageName === "complete") {
+    } else if (stageName === "done") {
       this.setCoreState("complete");
       if (currentEl) currentEl.classList.add("completed");
-      // Mark all lines completed
-      for (let i = 1; i <= 5; i++) {
+      // Mark all 4 lines completed
+      for (let i = 1; i <= 4; i++) {
         const line = document.getElementById(`line-${i}`);
         if (line) line.classList.add("completed");
       }
