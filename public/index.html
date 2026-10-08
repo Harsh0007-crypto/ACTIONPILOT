@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACTIONPILOT | Autonomous AI for Getting Things Done</title>
+  <meta name="description" content="Autonomous AI personal assistant that plans, reasons, and executes everyday tasks with real tools and human oversight.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dark-theme">
+  <!-- Cyber Background Gradients & Grid -->
+  <div class="bg-fx-grid"></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-container">
+        <div class="brand-icon">
+          <svg viewBox="0 0 32 32" fill="none" class="brand-svg">
+            <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2" class="svg-ring-outer"/>
+            <polygon points="16,4 20,13 30,13 22,19 25,28 16,23 7,28 10,19 2,13 12,13" fill="none" stroke="currentColor" stroke-width="1.5" class="svg-star"/>
+            <circle cx="16" cy="16" r="3.5" fill="currentColor" class="svg-core-dot"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">ACTIONPILOT</span>
+          <span class="brand-tagline">Turn intentions into actions</span>
+        </div>
+      </div>
+      <div class="track-badge">
+        <span class="badge-dot"></span>
+        AI Personal Assistant & Autonomous Agents
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="engine-badge" id="engineStatusBadge" title="Current cognitive engine">
+        <span class="engine-indicator pulse" id="enginePulse"></span>
+        <span class="engine-label" id="engineLabel">Gemini AI / Fallback Ready</span>
+      </div>
+
+      <button class="btn btn-ghost" id="btnSettings" title="Configure AI & Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Settings</span>
+      </button>
+
+      <button class="btn btn-ghost" id="btnResetState" title="Reset to initial demo baseline">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span>Reset State</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-layout">
+    
+    <!-- Top Hero Section: Goal Input & Demo Quick-Actions -->
+    <section class="hero-command-card">
+      <div class="hero-header">
+        <div class="hero-title-group">
+          <h1 class="hero-headline">Autonomous Goal Execution</h1>
+          <p class="hero-subtext">Provide a messy natural-language objective. ActionPilot decomposes intent, coordinates tools, enforces human safety gates, and executes.</p>
+        </div>
+      </div>
+
+      <!-- Command Input Box -->
+      <div class="command-input-container">
+        <div class="input-glow-frame">
+          <div class="input-icon-lead">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          </div>
+          <textarea 
+            id="goalInput" 
+            class="goal-textarea" 
+            rows="2" 
+            placeholder="E.g., I have a presentation tomorrow, two assignments due Friday, and an exam Monday. Organize my schedule."
+            spellcheck="false"
+          ></textarea>
+          <div class="input-actions">
+            <button class="btn btn-primary btn-run" id="btnRunAgent">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="run-icon">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span id="runButtonText">Run Agent</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Demo Scenarios Bar -->
+      <div class="demo-scenarios-row">
+        <span class="demo-scenarios-label">Try Demo Scenarios:</span>
+        <div class="demo-chips">
+          <button class="demo-chip" data-goal="Plan my preparation for tomorrow's presentation around my existing tasks.">
+            <span class="chip-icon">🎯</span>
+            <span class="chip-text">Presentation Prep</span>
+          </button>
+          <button class="demo-chip" data-goal="I have a maths assignment due Friday and an exam Monday. Create a study plan.">
+            <span class="chip-icon">📚</span>
+            <span class="chip-text">Math & Exam Plan</span>
+          </button>
+          <button class="demo-chip" data-goal="I need to organize my tasks for tomorrow and resolve any scheduling conflicts.">
+            <span class="chip-icon">⚡</span>
+            <span class="chip-text">Conflict Resolver</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Animated Agent Workflow Progression Bar -->
+    <section class="workflow-progression-bar" id="workflowBar">
+      <div class="workflow-stages">
+        <div class="stage-item" id="stage-understand" data-stage="understand">
+          <div class="stage-node">
+            <span class="stage-number">1</span>
+            <svg class="stage-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="stage-label">UNDERSTAND</span>
+        </div>
+        <div class="stage-line" id="line-1"></div>
+
+        <div class="stage-item" id="stage-plan" data-stage="plan">
+          <div class="stage-node">
+            <span class="stage-number">2</span>
+            <svg class="stage-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="stage-label">PLAN</span>
+        </div>
+        <div class="stage-line" id="line-2"></div>
+
+        <div class="stage-item" id="stage-tools" data-stage="tools">
+          <div class="stage-node">
+            <span class="stage-number">3</span>
+            <svg class="stage-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="stage-label">TOOLS</span>
+        </div>
+        <div class="stage-line" id="line-3"></div>
+
+        <div class="stage-item" id="stage-approval" data-stage="approval">
+          <div class="stage-node">
+            <span class="stage-number">4</span>
+            <svg class="stage-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="stage-label">APPROVAL</span>
+        </div>
+        <div class="stage-line" id="line-4"></div>
+
+        <div class="stage-item" id="stage-execute" data-stage="execute">
+          <div class="stage-node">
+            <span class="stage-number">5</span>
+            <svg class="stage-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="stage-label">EXECUTE</span>
+        </div>
+        <div class="stage-line" id="line-5"></div>
+
+        <div class="stage-item" id="stage-complete" data-stage="complete">
+          <div class="stage-node">
+            <span class="stage-number">6</span>
+            <svg class="stage-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="stage-label">COMPLETE</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Holographic AI Core & Status Bar -->
+    <div class="agent-telemetry-hud">
+      <div class="hud-left">
+        <div class="ai-core-visualizer" id="aiCoreVisualizer">
+          <div class="core-orbit core-orbit-1"></div>
+          <div class="core-orbit core-orbit-2"></div>
+          <div class="core-nucleus" id="coreNucleus"></div>
+        </div>
+        <div class="telemetry-info">
+          <span class="telemetry-eyebrow">AGENT STATUS</span>
+          <div class="telemetry-status" id="agentStatusText">AWAITING GOAL DIRECTIVE</div>
+        </div>
+      </div>
+
+      <div class="hud-right">
+        <div class="progress-container">
+          <div class="progress-meta">
+            <span class="progress-title" id="progressTitle">Execution Pipeline</span>
+            <span class="progress-pct" id="progressPercent">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-bar" id="agentProgressBar" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Human-In-The-Loop Approval Banner (Dynamic) -->
+    <div class="approval-card-wrapper hidden" id="approvalCardWrapper">
+      <div class="approval-card glass-panel" id="approvalCard">
+        <div class="approval-header">
+          <div class="approval-badge">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            HUMAN-IN-THE-LOOP APPROVAL REQUIRED
+          </div>
+          <span class="approval-agent-tag">Autonomous Guardrail Activated</span>
+        </div>
+
+        <div class="approval-body">
+          <div class="approval-action-title" id="approvalActionTitle">
+            Reschedule "Client Progress Review" to 04:30 PM
+          </div>
+          
+          <div class="approval-reasons-grid">
+            <div class="approval-meta-col">
+              <span class="approval-meta-label">Reason:</span>
+              <p class="approval-meta-val" id="approvalReasonText">
+                Moving an existing external stakeholder meeting disrupts confirmed calendar invites.
+              </p>
+            </div>
+            <div class="approval-meta-col">
+              <span class="approval-meta-label">Anticipated Impact:</span>
+              <p class="approval-meta-val" id="approvalImpactText">
+                Frees up a prime 2-hour uninterrupted rehearsal block from 01:30 PM to 03:30 PM tomorrow.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="approval-footer">
+          <button class="btn btn-reject" id="btnRejectAction">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>Reject Action</span>
+          </button>
+          <button class="btn btn-approve" id="btnApproveAction">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Approve & Execute</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dual Column Cockpit Grid -->
+    <div class="cockpit-grid">
+      
+      <!-- LEFT COLUMN: Agent Cognition, Action Pipeline, & Activity Log -->
+      <div class="cockpit-column left-column">
+        
+        <!-- Agent Reasoning & Intent Breakdown -->
+        <div class="card glass-panel" id="reasoningPanel">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <span>Cognitive Reasoning & Constraints</span>
+            </div>
+            <span class="card-badge" id="sourceBadge">Autonomous Engine</span>
+          </div>
+
+          <div class="card-content">
+            <div class="intent-box" id="intentBox">
+              <div class="intent-meta">
+                <span class="intent-label">UNDERSTOOD INTENT:</span>
+                <span class="urgency-pill" id="urgencyPill">Ready</span>
+              </div>
+              <p class="intent-text" id="intentText">
+                Input a goal or select a scenario above. ActionPilot will decompose requirements, parse deadlines, and construct an execution plan.
+              </p>
+            </div>
+
+            <div class="constraints-container" id="constraintsContainer">
+              <span class="section-subhead">Extracted Constraints:</span>
+              <ul class="constraints-list" id="constraintsList">
+                <li class="empty-state-hint">Constraints will be extracted automatically upon goal analysis.</li>
+              </ul>
+            </div>
+
+            <div class="reasoning-summary-box" id="reasoningBox">
+              <span class="section-subhead">Planning Rationale:</span>
+              <p class="reasoning-text" id="reasoningText">
+                Awaiting directive. Once analyzed, ActionPilot will display step-by-step reasoning logic and tool orchestration strategy here.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Planned Action Execution Pipeline -->
+        <div class="card glass-panel" id="actionsPanel">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              <span>Planned Actions & Tool Sequence</span>
+            </div>
+            <span class="action-count-badge" id="actionCountBadge">0 Steps</span>
+          </div>
+
+          <div class="card-content">
+            <div class="actions-list" id="actionsList">
+              <div class="empty-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                </svg>
+                <span>No action pipeline generated yet</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time Activity Feed -->
+        <div class="card glass-panel" id="activityPanel">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+              </svg>
+              <span>Live Agent Activity Feed</span>
+            </div>
+            <button class="btn-text-action" id="btnClearActivity">Clear</button>
+          </div>
+
+          <div class="card-content">
+            <div class="activity-feed" id="activityFeed">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: Real Connected Tools State Inspector -->
+      <div class="cockpit-column right-column">
+        <div class="card glass-panel tools-container">
+          <div class="tools-header-tabs">
+            <div class="tool-tab-btn active" data-tab="tab-tasks">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+              </svg>
+              <span>Tasks</span>
+              <span class="tool-count" id="toolTaskCount">0</span>
+            </div>
+
+            <div class="tool-tab-btn" data-tab="tab-schedule">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span>Schedule</span>
+              <span class="tool-count" id="toolScheduleCount">0</span>
+            </div>
+
+            <div class="tool-tab-btn" data-tab="tab-notes">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <span>Notes & Intel</span>
+              <span class="tool-count" id="toolNotesCount">0</span>
+            </div>
+          </div>
+
+          <!-- Tab Content: Tasks Tool -->
+          <div class="tab-pane active" id="tab-tasks">
+            <div class="tool-pane-header">
+              <span class="tool-pane-desc">Internal Task Tool &bull; Autonomous Task Allocation</span>
+              <span class="tool-status-live">LIVE SYNC</span>
+            </div>
+            <div class="tasks-board" id="tasksBoard">
+              <!-- Task cards -->
+            </div>
+          </div>
+
+          <!-- Tab Content: Schedule Tool -->
+          <div class="tab-pane" id="tab-schedule">
+            <div class="tool-pane-header">
+              <span class="tool-pane-desc">Internal Schedule Tool &bull; Conflict Detection Active</span>
+              <span class="tool-status-live">CALENDAR ENGINE</span>
+            </div>
+            <div class="schedule-calendar" id="scheduleBoard">
+              <!-- Schedule event cards -->
+            </div>
+          </div>
+
+          <!-- Tab Content: Notes Tool -->
+          <div class="tab-pane" id="tab-notes">
+            <div class="tool-pane-header">
+              <span class="tool-pane-desc">Internal Notes & Info Tool &bull; Structured Briefing Dossier</span>
+              <span class="tool-status-live">KNOWLEDGE REPO</span>
+            </div>
+            <div class="notes-board" id="notesBoard">
+              <!-- Notes cards -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Mission Complete Modal -->
+  <div class="modal-overlay hidden" id="completionModal">
+    <div class="modal-card glass-panel-modal">
+      <div class="completion-hero">
+        <div class="completion-icon-ring">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <h2 class="completion-title">MISSION COMPLETE</h2>
+        <p class="completion-subtitle" id="completeGoalText">Goal executed successfully with autonomous tool coordination</p>
+      </div>
+
+      <div class="completion-metrics-grid">
+        <div class="completion-metric-box">
+          <span class="metric-num text-cyan" id="metricTasks">0</span>
+          <span class="metric-label">Tasks Created/Updated</span>
+        </div>
+        <div class="completion-metric-box">
+          <span class="metric-num text-violet" id="metricSchedule">0</span>
+          <span class="metric-label">Calendar Items Adjusted</span>
+        </div>
+        <div class="completion-metric-box">
+          <span class="metric-num text-emerald" id="metricApproved">0</span>
+          <span class="metric-label">Actions Approved</span>
+        </div>
+        <div class="completion-metric-box">
+          <span class="metric-num text-rose" id="metricRejected">0</span>
+          <span class="metric-label">Actions Rejected</span>
+        </div>
+      </div>
+
+      <div class="completion-summary-panel">
+        <span class="summary-box-label">Executive Briefing Summary:</span>
+        <p class="summary-box-text" id="completeSummaryText">
+          All prioritized tasks have been orchestrated. Scheduling conflicts were resolved and confirmed via human-in-the-loop oversight.
+        </p>
+      </div>
+
+      <div class="completion-modal-actions">
+        <button class="btn btn-secondary" id="btnViewActivityFeed">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <span>View Activity Log</span>
+        </button>
+        <button class="btn btn-primary" id="btnDismissCompletion">
+          <span>Close & Inspect State</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings & Custom Key Modal -->
+  <div class="modal-overlay hidden" id="settingsModal">
+    <div class="modal-card glass-panel-modal modal-settings">
+      <div class="settings-header">
+        <div class="modal-header-title">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <h3>ActionPilot Engine Settings</h3>
+        </div>
+        <button class="btn-close-modal" id="btnCloseSettings">&times;</button>
+      </div>
+
+      <div class="settings-content">
+        <div class="settings-info-card">
+          <span class="info-tag">DEFENSIVE ARCHITECTURE</span>
+          <p>
+            API keys are processed exclusively via secure server-side execution. Never exposed to browser JavaScript or stored in git.
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="apiKeyInput">Google Gemini API Key (Optional)</label>
+          <input 
+            type="password" 
+            id="apiKeyInput" 
+            class="form-input" 
+            placeholder="AIzaSy... (leave blank to use autonomous fallback)"
+            autocomplete="off"
+          />
+          <span class="form-hint">
+            If left blank or unavailable, ActionPilot immediately utilizes the built-in deterministic planning engine with full tool fidelity.
+          </span>
+        </div>
+
+        <div class="hackathon-specs-box">
+          <div class="spec-row">
+            <span class="spec-key">Hackathon Track:</span>
+            <span class="spec-val">AI Personal Assistant &amp; Autonomous Agents</span>
+          </div>
+          <div class="spec-row">
+            <span class="spec-key">Core Model:</span>
+            <span class="spec-val">Google Gemini 2.5 Flash / Autonomous Fallback</span>
+          </div>
+          <div class="spec-row">
+            <span class="spec-key">Connected Tools:</span>
+            <span class="spec-val">Tasks, Schedule, Notes, Info Synthesizer</span>
+          </div>
+          <div class="spec-row">
+            <span class="spec-key">Host Binding:</span>
+            <span class="spec-val">0.0.0.0 (Deploy Ready)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="btn btn-secondary" id="btnCancelSettings">Cancel</button>
+        <button class="btn btn-primary" id="btnSaveSettings">Save Preferences</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/toolsView.js"></script>
+  <script src="js/workflow.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
