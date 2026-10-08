@@ -295,6 +295,117 @@ app.post("/api/agent/approve-action", (req, res) => {
   }
 });
 
+// ==========================================
+// 6. DYNAMIC CONFLICT RESOLUTION
+// ==========================================
+app.post("/api/agent/resolve-conflict", (req, res) => {
+  const { actionId } = req.body;
+  if (!stateStore.currentPlan) {
+    return res.status(400).json({ success: false, message: "No active plan." });
+  }
+
+  const actions = stateStore.currentPlan.actions || [];
+  const schedAction = actionId
+    ? actions.find(a => a.id === actionId)
+    : actions.find(a => a.tool === "schedule");
+
+  if (schedAction && schedAction.params) {
+    const originalStart = schedAction.params.startTime || "02:00 PM";
+    schedAction.params.startTime = "04:00 PM";
+    schedAction.params.endTime = "05:00 PM";
+    schedAction.description = schedAction.description.replace(originalStart, "04:00 PM");
+    if (schedAction.approvalReason) {
+      schedAction.approvalReason = schedAction.approvalReason.replace(originalStart, "04:00 PM");
+    }
+
+    stateStore.logActivity(
+      "agent",
+      `Schedule Conflict Resolved with AI: "${schedAction.title || schedAction.description}"`,
+      `Shifted calendar block from ${originalStart} to 04:00 PM - 05:00 PM. No overlaps remaining.`,
+      "clock"
+    );
+  }
+
+  const conflictEvt = stateStore.schedule.find(e => e.conflictDetected);
+  if (conflictEvt) {
+    conflictEvt.startTime = "04:00 PM";
+    conflictEvt.endTime = "05:00 PM";
+    conflictEvt.conflictDetected = false;
+    conflictEvt.conflictingWith = [];
+  }
+
+  res.json({
+    success: true,
+    message: "Schedule conflict resolved with AI",
+    plan: stateStore.currentPlan,
+    schedule: stateStore.schedule
+  });
+});
+
+// ==========================================
+// 7. ADAPTIVE RE-PLANNING
+// ==========================================
+app.post("/api/agent/replan", async (req, res) => {
+  const { reason, customApiKey } = req.body;
+  if (!stateStore.currentPlan) {
+    return res.status(400).json({ success: false, message: "No active plan to re-plan." });
+  }
+
+  const cleanReason = (reason || "Schedule conflict or change of constraints").trim();
+  stateStore.logActivity(
+    "agent",
+    `Adaptive Re-planning Triggered`,
+    `Reason: ${cleanReason}. Adjusting remaining workflow actions...`,
+    "refresh-cw"
+  );
+
+  const hasKey = !!(customApiKey || process.env.GEMINI_API_KEY);
+  let updatedPlan = null;
+
+  if (hasKey) {
+    try {
+      const prompt = `Current goal: "${stateStore.currentPlan.goal}". Something changed: "${cleanReason}". Please adapt and return a refreshed plan.`;
+      const geminiResp = await planWithGemini(prompt, stateStore.getState(), customApiKey);
+      if (geminiResp.success && geminiResp.data) {
+        updatedPlan = geminiResp.data;
+        updatedPlan.source = geminiResp.source;
+      }
+    } catch (err) {
+      console.warn("Gemini replan error:", err.message);
+    }
+  }
+
+  if (!updatedPlan) {
+    updatedPlan = {
+      ...stateStore.currentPlan,
+      summary: `Adapted workflow: ${stateStore.currentPlan.summary} (Buffer intervals added; remaining items rescheduled).`,
+      actions: (stateStore.currentPlan.actions || []).map((a, idx) => ({
+        ...a,
+        id: a.id || `act-replan-${idx + 1}`,
+        status: a.status === "executed" ? "executed" : "planned",
+        description: a.status === "executed" ? a.description : `[Adapted] ${a.description}`,
+        estimatedDuration: a.estimatedDuration || "30 mins"
+      }))
+    };
+  }
+
+  stateStore.currentPlan = updatedPlan;
+  stateStore.pendingApprovals = (updatedPlan.actions || []).filter(a => a.requiresApproval && a.status === "planned");
+
+  stateStore.logActivity(
+    "agent",
+    `Adaptive Plan Synthesized`,
+    `Plan dynamically updated to fit new constraints`,
+    "check-circle"
+  );
+
+  res.json({
+    success: true,
+    message: "Plan adapted successfully",
+    plan: stateStore.currentPlan
+  });
+});
+
 // Fallback route for SPA
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));

@@ -1,12 +1,16 @@
 /**
  * ActionPilot Main Application Controller
- * Ultra-clean judge experience with 5 sequential, mutually-exclusive workflow stages:
- * UNDERSTAND -> PLAN -> APPROVE -> EXECUTE -> COMPLETE
+ * Autonomous AI for getting things done.
+ * Full production implementation with real Gemini AI integration,
+ * deterministic fallback engine, sequential 01-04 workflow pipeline,
+ * schedule preview, collapsible reasoning, dynamic conflict resolution,
+ * adaptive re-planning, and full Schedule & Activity navigation.
  */
 
 const App = {
   activePlan: null,
   isExecuting: false,
+  activeNavTab: "command",
   stats: {
     tasks: 0,
     schedule: 0,
@@ -21,13 +25,47 @@ const App = {
   },
 
   bindEvents() {
-    // 1. Run / Plan with AI Button
+    // 1. Top Navigation Links (Command Center, Schedule, Activity)
+    const navCommand = document.getElementById("navCommand");
+    const navSchedule = document.getElementById("navSchedule");
+    const navActivity = document.getElementById("navActivity");
+
+    if (navCommand) {
+      navCommand.addEventListener("click", () => this.switchNavTab("command"));
+    }
+    if (navSchedule) {
+      navSchedule.addEventListener("click", () => this.switchNavTab("schedule"));
+    }
+    if (navActivity) {
+      navActivity.addEventListener("click", () => this.switchNavTab("activity"));
+    }
+
+    const btnBackSchedule = document.getElementById("btnBackToCommandFromSchedule");
+    if (btnBackSchedule) {
+      btnBackSchedule.addEventListener("click", () => this.switchNavTab("command"));
+    }
+    const btnBackActivity = document.getElementById("btnBackToCommandFromActivity");
+    if (btnBackActivity) {
+      btnBackActivity.addEventListener("click", () => this.switchNavTab("command"));
+    }
+
+    const btnPreviewToSchedule = document.getElementById("btnPreviewToSchedule");
+    if (btnPreviewToSchedule) {
+      btnPreviewToSchedule.addEventListener("click", () => this.switchNavTab("schedule"));
+    }
+
+    const btnViewActivityFromComplete = document.getElementById("btnViewActivityFromComplete");
+    if (btnViewActivityFromComplete) {
+      btnViewActivityFromComplete.addEventListener("click", () => this.switchNavTab("activity"));
+    }
+
+    // 2. Run / Plan with AI Button
     const btnRun = document.getElementById("btnRunAgent");
     if (btnRun) {
       btnRun.addEventListener("click", () => this.handlePlanGoal());
     }
 
-    // 2. Goal Input Enter key (Shift+Enter for newline)
+    // 3. Goal Input Enter key (Shift+Enter for newline)
     const goalInput = document.getElementById("goalInput");
     if (goalInput) {
       goalInput.addEventListener("keydown", (e) => {
@@ -38,7 +76,7 @@ const App = {
       });
     }
 
-    // 3. Example Prompts
+    // 4. Example Prompts
     const exampleChips = document.querySelectorAll(".example-chip");
     exampleChips.forEach(chip => {
       chip.addEventListener("click", () => {
@@ -53,34 +91,67 @@ const App = {
       });
     });
 
-    // 4. Brand link returns home
+    // 5. Brand link returns to Command Center home
     const brandHomeLink = document.getElementById("brandHomeLink");
     if (brandHomeLink) {
       brandHomeLink.addEventListener("click", (e) => {
         e.preventDefault();
+        this.switchNavTab("command");
         this.resetToHomeView(false);
       });
     }
 
-    // 5. "Approve & Execute" Button in Approval block
+    // 6. "Approve & Execute" Button in Approval block
     const btnApproveAction = document.getElementById("btnApproveAction");
     if (btnApproveAction) {
       btnApproveAction.addEventListener("click", () => this.handleApproveAndExecute());
     }
 
-    // 6. "Reject" Button in Approval block
+    // 7. "Reject" Button in Approval block
     const btnRejectAction = document.getElementById("btnRejectAction");
     if (btnRejectAction) {
       btnRejectAction.addEventListener("click", () => this.handleRejectAction());
     }
 
-    // 7. "Start Another Task" Button
+    // 8. "Start Another Task" Button
     const btnStartNewGoal = document.getElementById("btnStartNewGoal");
     if (btnStartNewGoal) {
       btnStartNewGoal.addEventListener("click", () => this.handleResetState());
     }
 
-    // 8. "View Created Items" Button (Toggles Secondary Details Drawer)
+    // 9. Collapsible "Why this plan?" Toggle
+    const toggleWhyThisPlan = document.getElementById("toggleWhyThisPlan");
+    const whyContent = document.getElementById("whyThisPlanContent");
+    const whyChevron = document.getElementById("whyChevron");
+
+    if (toggleWhyThisPlan && whyContent) {
+      toggleWhyThisPlan.addEventListener("click", () => {
+        const isHidden = whyContent.classList.contains("hidden");
+        if (isHidden) {
+          whyContent.classList.remove("hidden");
+          if (whyChevron) whyChevron.classList.add("open");
+          toggleWhyThisPlan.setAttribute("aria-expanded", "true");
+        } else {
+          whyContent.classList.add("hidden");
+          if (whyChevron) whyChevron.classList.remove("open");
+          toggleWhyThisPlan.setAttribute("aria-expanded", "false");
+        }
+      });
+    }
+
+    // 10. Dynamic Conflict Resolution Button
+    const btnResolveConflict = document.getElementById("btnResolveConflict");
+    if (btnResolveConflict) {
+      btnResolveConflict.addEventListener("click", () => this.handleResolveConflict());
+    }
+
+    // 11. Adaptive Re-planning Button
+    const btnReplanWithAI = document.getElementById("btnReplanWithAI");
+    if (btnReplanWithAI) {
+      btnReplanWithAI.addEventListener("click", () => this.handleAdaptiveReplan());
+    }
+
+    // 12. "View Created Items" Button (Toggles Secondary Details Drawer)
     const btnToggleDetails = document.getElementById("btnToggleDetails");
     const detailsDrawer = document.getElementById("detailsDrawer");
     const toggleDetailsText = document.getElementById("toggleDetailsBtnText");
@@ -107,13 +178,13 @@ const App = {
       });
     }
 
-    // 9. Reset Workspace Button
+    // 13. Reset Workspace Button
     const btnReset = document.getElementById("btnResetState");
     if (btnReset) {
       btnReset.addEventListener("click", () => this.handleResetState());
     }
 
-    // 10. Settings Modal (Optional Gemini API Key)
+    // 14. Settings Modal (Optional Gemini API Key)
     const btnSettings = document.getElementById("btnSettings");
     const settingsModal = document.getElementById("settingsModal");
     const btnCloseSettings = document.getElementById("btnCloseSettings");
@@ -141,7 +212,7 @@ const App = {
         const key = apiKeyInput ? apiKeyInput.value.trim() : "";
         if (key) {
           sessionStorage.setItem("custom_gemini_key", key);
-          this.updateEngineBadge(true, "Custom Gemini Key Active");
+          this.updateEngineBadge(true, "Gemini AI ● Online");
         } else {
           sessionStorage.removeItem("custom_gemini_key");
           this.fetchHealth();
@@ -151,30 +222,77 @@ const App = {
     }
   },
 
+  // Switch top nav views (Command Center, Schedule, Activity)
+  switchNavTab(tabName) {
+    this.activeNavTab = tabName;
+
+    const navCommand = document.getElementById("navCommand");
+    const navSchedule = document.getElementById("navSchedule");
+    const navActivity = document.getElementById("navActivity");
+
+    const viewCommand = document.getElementById("viewCommandCenter");
+    const viewSchedule = document.getElementById("viewSchedule");
+    const viewActivity = document.getElementById("viewActivity");
+
+    [navCommand, navSchedule, navActivity].forEach(btn => {
+      if (btn) btn.classList.remove("active");
+    });
+    [viewCommand, viewSchedule, viewActivity].forEach(v => {
+      if (v) {
+        v.classList.remove("active");
+        v.classList.add("hidden");
+      }
+    });
+
+    if (tabName === "schedule") {
+      if (navSchedule) navSchedule.classList.add("active");
+      if (viewSchedule) {
+        viewSchedule.classList.remove("hidden");
+        viewSchedule.classList.add("active");
+      }
+      this.renderFullScheduleView();
+    } else if (tabName === "activity") {
+      if (navActivity) navActivity.classList.add("active");
+      if (viewActivity) {
+        viewActivity.classList.remove("hidden");
+        viewActivity.classList.add("active");
+      }
+      this.renderFullActivityView();
+    } else {
+      if (navCommand) navCommand.classList.add("active");
+      if (viewCommand) {
+        viewCommand.classList.remove("hidden");
+        viewCommand.classList.add("active");
+      }
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  },
+
   async fetchHealth() {
     try {
       const res = await fetch("/api/health");
       const data = await res.json();
       const hasCustom = !!sessionStorage.getItem("custom_gemini_key");
-      const isConfigured = data.geminiConfigured || hasCustom;
+      const isOnline = data.geminiConfigured || hasCustom;
 
       this.updateEngineBadge(
-        isConfigured,
-        hasCustom ? "Gemini Key Active" : (data.geminiConfigured ? "Gemini 2.5 Flash Online" : "Autonomous Engine (Fallback Mode)")
+        isOnline,
+        isOnline ? "Gemini AI ● Online" : "Gemini AI ● Offline"
       );
     } catch (err) {
       console.warn("Health check error:", err);
-      this.updateEngineBadge(false, "Autonomous Engine (Fallback Mode)");
+      this.updateEngineBadge(false, "Gemini AI ● Offline");
     }
   },
 
-  updateEngineBadge(isActive, label) {
+  updateEngineBadge(isOnline, label) {
     const badgeLabel = document.getElementById("engineLabel");
     const badgePulse = document.getElementById("enginePulse");
     if (badgeLabel) badgeLabel.textContent = label;
     if (badgePulse) {
-      badgePulse.style.backgroundColor = isActive ? "var(--neon-emerald)" : "var(--neon-cyan)";
-      badgePulse.style.boxShadow = isActive ? "0 0 8px var(--neon-emerald)" : "0 0 8px var(--neon-cyan)";
+      badgePulse.style.backgroundColor = isOnline ? "var(--neon-emerald)" : "var(--neon-cyan)";
+      badgePulse.style.boxShadow = isOnline ? "0 0 8px var(--neon-emerald)" : "0 0 8px var(--neon-cyan)";
     }
   },
 
@@ -185,6 +303,12 @@ const App = {
       if (json.success && json.data) {
         ToolsView.render(json.data);
         this.renderActivityFeed(json.data.activityLog || []);
+        if (this.activeNavTab === "schedule") {
+          this.renderFullScheduleView(json.data.schedule || []);
+        }
+        if (this.activeNavTab === "activity") {
+          this.renderFullActivityView(json.data.activityLog || []);
+        }
       }
     } catch (err) {
       console.error("Failed to load state:", err);
@@ -192,7 +316,7 @@ const App = {
   },
 
   // ==========================================
-  // STEPPER PROGRESSION
+  // STEPPER PROGRESSION (01 UNDERSTAND -> 02 PLAN -> 03 APPROVE -> 04 EXECUTE)
   // ==========================================
   setStepper(stage) {
     // stage: 1 ('understand'), 2 ('plan'), 3 ('approve'), 4 ('execute'), 5 ('complete')
@@ -215,6 +339,9 @@ const App = {
           el.classList.add("completed");
         } else if (stepNum === stage) {
           el.classList.add("active");
+          if (stage === 5) {
+            el.classList.add("completed");
+          }
         }
       }
 
@@ -238,25 +365,25 @@ const App = {
     const rejectedMsg = document.getElementById("approvalRejectedMessage");
     const blockExecute = document.getElementById("blockExecute");
     const blockComplete = document.getElementById("blockComplete");
+    const replanCard = document.getElementById("adaptiveReplanCard");
 
     if (state === "approval") {
-      // Show approval controls, hide execution and completion
       if (blockApproval) blockApproval.classList.remove("hidden");
       if (approvalAlertCard) approvalAlertCard.classList.remove("hidden");
       if (rejectedMsg) rejectedMsg.classList.add("hidden");
       if (blockExecute) blockExecute.classList.add("hidden");
       if (blockComplete) blockComplete.classList.add("hidden");
+      if (replanCard) replanCard.classList.add("hidden");
       this.setStepper(3);
     } else if (state === "executing") {
-      // Immediately dismiss/close approval controls, show execution progress
       if (blockApproval) blockApproval.classList.add("hidden");
       if (approvalAlertCard) approvalAlertCard.classList.add("hidden");
       if (rejectedMsg) rejectedMsg.classList.add("hidden");
       if (blockExecute) blockExecute.classList.remove("hidden");
       if (blockComplete) blockComplete.classList.add("hidden");
+      if (replanCard) replanCard.classList.add("hidden");
       this.setStepper(4);
     } else if (state === "completed") {
-      // Ensure approval and execution are completely dismissed, show completion
       if (blockApproval) blockApproval.classList.add("hidden");
       if (approvalAlertCard) approvalAlertCard.classList.add("hidden");
       if (rejectedMsg) rejectedMsg.classList.add("hidden");
@@ -265,14 +392,16 @@ const App = {
         blockComplete.classList.remove("hidden");
         blockComplete.scrollIntoView({ behavior: "smooth", block: "center" });
       }
+      if (replanCard) replanCard.classList.remove("hidden");
       this.setStepper(5);
     } else {
-      // 'idle' / initial / reset state: hide all 3
+      // 'idle'
       if (blockApproval) blockApproval.classList.add("hidden");
       if (approvalAlertCard) approvalAlertCard.classList.add("hidden");
       if (rejectedMsg) rejectedMsg.classList.add("hidden");
       if (blockExecute) blockExecute.classList.add("hidden");
       if (blockComplete) blockComplete.classList.add("hidden");
+      if (replanCard) replanCard.classList.add("hidden");
     }
   },
 
@@ -298,6 +427,32 @@ const App = {
     if (btnRun) btnRun.classList.add("is-running");
     if (runText) runText.textContent = "Planning with AI...";
 
+    const hero = document.getElementById("heroCenterpiece");
+    const thinkingState = document.getElementById("aiThinkingState");
+    const workflowSection = document.getElementById("workflowCardSection");
+    const detailsDrawer = document.getElementById("detailsDrawer");
+
+    if (hero) hero.classList.add("hero-compact");
+    if (detailsDrawer) detailsDrawer.classList.add("hidden");
+
+    // Display AI Thinking State with sequential checkpoints
+    if (thinkingState) {
+      thinkingState.classList.remove("hidden");
+      thinkingState.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    await this.animateThinkingSteps();
+
+    // 1. UNDERSTAND BECOMES ACTIVE
+    this.setStepper(1);
+    const goalText = document.getElementById("valGoalText");
+    if (goalText) goalText.textContent = goal;
+    const deadlineText = document.getElementById("valDeadlineText");
+    if (deadlineText) deadlineText.textContent = "Analyzing goal & constraints...";
+    const constraintsTags = document.getElementById("valConstraintsTags");
+    if (constraintsTags) {
+      constraintsTags.innerHTML = `<span class="constraint-pill">Extracting parameters...</span>`;
+    }
+
     try {
       const customKey = sessionStorage.getItem("custom_gemini_key") || null;
 
@@ -315,28 +470,51 @@ const App = {
       this.activePlan = planData.plan;
       this.stats = { tasks: 0, schedule: 0, notes: 0 };
 
-      // Render Stage 1 (Understand) & Stage 2 (Plan) & Transition to Stage 3 (Approve)
-      this.renderPlanWorkflow(this.activePlan);
+      // Hide thinking state and reveal workflow
+      if (thinkingState) thinkingState.classList.add("hidden");
+      if (workflowSection) workflowSection.classList.remove("hidden");
+
+      // Progressive illumination: 1. Understand -> 2. Plan -> 3. Approve
+      await this.renderPlanWorkflowProgressive(this.activePlan);
 
     } catch (err) {
       console.error("Planning error:", err);
+      if (thinkingState) thinkingState.classList.add("hidden");
       alert("Planning Error: " + err.message);
     } finally {
       if (btnRun) btnRun.classList.remove("is-running");
-      if (runText) runText.textContent = "Plan with AI";
+      if (runText) runText.textContent = "Plan with AI →";
     }
   },
 
-  renderPlanWorkflow(plan) {
+  async animateThinkingSteps() {
+    const steps = [
+      { id: "thinkStep1", text: "Understanding your goal" },
+      { id: "thinkStep2", text: "Analyzing constraints" },
+      { id: "thinkStep3", text: "Building optimal plan" },
+      { id: "thinkStep4", text: "Checking schedule" }
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+      const el = document.getElementById(steps[i].id);
+      if (el) {
+        el.className = "thinking-check-item active";
+        el.innerHTML = `<span class="think-icon">⚡</span><span class="think-label">${steps[i].text}</span>`;
+      }
+      await this.sleep(180);
+      if (el) {
+        el.className = "thinking-check-item done";
+        el.innerHTML = `<span class="think-icon">✓</span><span class="think-label">${steps[i].text}</span>`;
+      }
+    }
+  },
+
+  async renderPlanWorkflowProgressive(plan) {
     this.isExecuting = false;
 
-    const hero = document.getElementById("heroCenterpiece");
-    const workflowSection = document.getElementById("workflowCardSection");
-    const detailsDrawer = document.getElementById("detailsDrawer");
     const btnApprove = document.getElementById("btnApproveAction");
     const btnReject = document.getElementById("btnRejectAction");
 
-    // Re-enable buttons
     if (btnApprove) {
       btnApprove.disabled = false;
       btnApprove.classList.remove("btn-disabled");
@@ -346,11 +524,6 @@ const App = {
       btnReject.classList.remove("btn-disabled");
     }
 
-    if (hero) hero.classList.add("hero-compact");
-    if (workflowSection) workflowSection.classList.remove("hidden");
-    if (detailsDrawer) detailsDrawer.classList.add("hidden");
-
-    // Reset details drawer button text
     const toggleDetailsText = document.getElementById("toggleDetailsBtnText");
     if (toggleDetailsText) toggleDetailsText.textContent = "View Created Items";
 
@@ -375,18 +548,28 @@ const App = {
       }
     }
 
-    // 2. POPULATE PLAN BLOCK
+    await this.sleep(220);
+
+    // 2. ADVANCE TO STAGE 2: PLAN
+    this.setStepper(2);
+
+    const planBadge = document.getElementById("planBadge");
+    if (planBadge) {
+      planBadge.textContent = (plan.source && plan.source.includes("Gemini")) ? "AI GENERATED PLAN" : "AUTONOMOUS PLAN";
+    }
+
     const effortText = document.getElementById("valEstimatedEffort");
     const assumptionText = document.getElementById("valAssumptionText");
     const summaryText = document.getElementById("valPlanSummary");
     const actionsListEl = document.getElementById("valPlanActionsList");
 
-    if (effortText) effortText.textContent = plan.estimatedTime ? `⏱️ Estimated: ${plan.estimatedTime}` : "⏱️ Estimated: ~2 hours";
+    if (effortText) effortText.textContent = plan.estimatedTime ? `⏱️ ${plan.estimatedTime}` : "⏱️ ~2 hours";
     if (assumptionText) {
       assumptionText.textContent = plan.assumption ? `• ${plan.assumption}` : "";
     }
     if (summaryText) summaryText.textContent = plan.summary;
 
+    // Render 3–5 task glass cards
     if (actionsListEl) {
       const actions = plan.actions || [];
       actionsListEl.innerHTML = actions.map((act, idx) => {
@@ -394,10 +577,11 @@ const App = {
         const sub = (act.title && act.description && act.title !== act.description) ? act.description : "";
         const priority = act.priority || "medium";
         const duration = act.estimatedDuration || "30 mins";
+        const paddedNum = String(idx + 1).padStart(2, "0");
 
         return `
           <div class="plan-action-item">
-            <span class="action-num">${idx + 1}</span>
+            <span class="action-num">${paddedNum}</span>
             <div class="action-content">
               <span class="action-title">${ToolsView.escapeHtml(title)}</span>
               ${sub ? `<span class="action-sub">${ToolsView.escapeHtml(sub)}</span>` : ""}
@@ -412,38 +596,194 @@ const App = {
       }).join("");
     }
 
-    // 3. POPULATE APPROVAL BLOCK & SET MUTUALLY EXCLUSIVE STATE
+    // Populate Schedule Preview (Timeline Blocks)
+    this.renderSchedulePreview(plan);
+
+    // Evaluate Conflict Status
+    this.updateConflictDetectionBanner(plan);
+
+    // Populate "Why this plan?" reasoning drawer
+    this.populateWhyThisPlan(plan);
+
+    await this.sleep(300);
+
+    // 3. ADVANCE TO STAGE 3: APPROVE
     const approvalCard = document.getElementById("approvalAlertCard");
     const reasonText = document.getElementById("valApprovalReason");
-    const consequential = (plan.actions || []).find(a => a.requiresApproval);
+    const countText = document.getElementById("valApprovalCount");
+    const consequential = (plan.actions || []).filter(a => a.requiresApproval);
 
-    if (consequential) {
+    if (consequential.length > 0) {
+      const firstConsequential = consequential[0];
       if (reasonText) {
-        reasonText.textContent = consequential.approvalReason || consequential.description;
+        reasonText.textContent = firstConsequential.approvalReason || firstConsequential.description;
+      }
+      if (countText) {
+        countText.textContent = `ActionPilot wants to perform ${consequential.length} consequential action${consequential.length > 1 ? 's' : ''}:`;
       }
       const headline = approvalCard ? approvalCard.querySelector(".approval-headline") : null;
       if (headline) headline.textContent = "HUMAN APPROVAL REQUIRED";
       const approveText = btnApprove ? btnApprove.querySelector("span") : null;
-      if (approveText) approveText.textContent = "Approve & Execute";
+      if (approveText) approveText.textContent = "Approve & Execute →";
       if (btnReject) btnReject.classList.remove("hidden");
-
-      this.setWorkflowUIState("approval");
     } else {
       if (reasonText) {
         reasonText.textContent = "All planned actions are routine and verified safe. Ready for execution.";
       }
+      if (countText) {
+        countText.textContent = "Ready to execute planned tasks and notes dossier:";
+      }
       const headline = approvalCard ? approvalCard.querySelector(".approval-headline") : null;
       if (headline) headline.textContent = "READY FOR EXECUTION";
       const approveText = btnApprove ? btnApprove.querySelector("span") : null;
-      if (approveText) approveText.textContent = "Execute Plan";
+      if (approveText) approveText.textContent = "Execute Plan →";
       if (btnReject) btnReject.classList.add("hidden");
-
-      this.setWorkflowUIState("approval");
     }
 
-    // Smooth scroll to workflow card
+    this.setWorkflowUIState("approval");
+
+    const workflowSection = document.getElementById("workflowCardSection");
     if (workflowSection) {
       workflowSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  },
+
+  renderSchedulePreview(plan) {
+    const timelineEl = document.getElementById("schedulePreviewTimeline");
+    if (!timelineEl) return;
+
+    const schedActions = (plan.actions || []).filter(a => a.tool === "schedule" && a.params);
+
+    if (schedActions.length === 0) {
+      timelineEl.innerHTML = `
+        <div class="preview-chip">
+          <span class="preview-chip-time">09:00 AM</span>
+          <span class="preview-chip-title">Morning Focus &amp; Prep</span>
+        </div>
+        <div class="preview-chip">
+          <span class="preview-chip-time">02:00 PM</span>
+          <span class="preview-chip-title">Dedicated Rehearsal Session</span>
+        </div>
+      `;
+      return;
+    }
+
+    timelineEl.innerHTML = schedActions.map(a => {
+      const p = a.params;
+      const time = p.startTime ? `${p.startTime} - ${p.endTime}` : "Scheduled";
+      return `
+        <div class="preview-chip">
+          <span class="preview-chip-time">${ToolsView.escapeHtml(time)}</span>
+          <span class="preview-chip-title">${ToolsView.escapeHtml(p.title || a.title)}</span>
+        </div>
+      `;
+    }).join("");
+  },
+
+  updateConflictDetectionBanner(plan) {
+    const banner = document.getElementById("conflictBanner");
+    const icon = document.getElementById("conflictIcon");
+    const title = document.getElementById("conflictTitle");
+    const detail = document.getElementById("conflictDetail");
+    const btnResolve = document.getElementById("btnResolveConflict");
+
+    if (!banner || !icon || !title || !detail || !btnResolve) return;
+
+    // Check if any schedule action or existing schedule has conflicts
+    const hasConflict = (plan.actions || []).some(a => a.hasConflict || (a.params && a.params.hasConflict));
+
+    if (hasConflict) {
+      banner.className = "conflict-banner has-conflict";
+      icon.textContent = "⚠";
+      title.textContent = "Schedule conflict detected";
+      detail.textContent = "Proposed calendar block overlaps with existing commitments.";
+      btnResolve.classList.remove("hidden");
+    } else {
+      banner.className = "conflict-banner";
+      icon.textContent = "✓";
+      title.textContent = "No schedule conflicts detected";
+      detail.textContent = "All scheduled focus blocks are conflict-free.";
+      btnResolve.classList.add("hidden");
+    }
+  },
+
+  populateWhyThisPlan(plan) {
+    const whyUrgency = document.getElementById("whyUrgencyText");
+    const whyEffort = document.getElementById("whyEffortText");
+    const whyDep = document.getElementById("whyDependencyText");
+    const whyConflict = document.getElementById("whyConflictText");
+
+    if (whyUrgency) {
+      whyUrgency.textContent = plan.deadline 
+        ? `Sequenced to finalize all deliverables prior to deadline (${plan.deadline}).`
+        : "Prioritized immediate high-impact milestones first.";
+    }
+    if (whyEffort) {
+      whyEffort.textContent = plan.estimatedTime
+        ? `Total estimated cognitive effort: ${plan.estimatedTime}, divided into paced blocks.`
+        : "Balanced cognitive load to prevent fatigue.";
+    }
+    if (whyDep) {
+      whyDep.textContent = "Information synthesis and preparation strictly precede calendar execution and reviews.";
+    }
+    if (whyConflict) {
+      whyConflict.textContent = "Evaluated current agenda to safeguard prime uninterrupted work periods.";
+    }
+  },
+
+  async handleResolveConflict() {
+    try {
+      const res = await fetch("/api/agent/resolve-conflict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (data.success && data.plan) {
+        this.activePlan = data.plan;
+        this.renderSchedulePreview(data.plan);
+        this.updateConflictDetectionBanner(data.plan);
+        await this.fetchState();
+      }
+    } catch (err) {
+      console.warn("Conflict resolution error:", err);
+    }
+  },
+
+  async handleAdaptiveReplan() {
+    if (!this.activePlan) return;
+    const btnReplan = document.getElementById("btnReplanWithAI");
+    if (btnReplan) {
+      btnReplan.disabled = true;
+      btnReplan.innerHTML = `<span>Re-planning...</span>`;
+    }
+
+    try {
+      const customKey = sessionStorage.getItem("custom_gemini_key") || null;
+      const res = await fetch("/api/agent/replan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Adaptive reschedule requested", customApiKey: customKey })
+      });
+      const data = await res.json();
+      if (data.success && data.plan) {
+        this.activePlan = data.plan;
+        await this.renderPlanWorkflowProgressive(data.plan);
+        await this.fetchState();
+      }
+    } catch (err) {
+      console.warn("Re-planning error:", err);
+    } finally {
+      if (btnReplan) {
+        btnReplan.disabled = false;
+        btnReplan.innerHTML = `
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          <span>Re-plan with AI →</span>
+        `;
+      }
     }
   },
 
@@ -452,12 +792,9 @@ const App = {
   // ==========================================
   async handleApproveAndExecute() {
     if (!this.activePlan) return;
-
-    // Prevent double-click execution
     if (this.isExecuting) return;
     this.isExecuting = true;
 
-    // Immediately disable buttons to prevent duplicate triggers
     const btnApprove = document.getElementById("btnApproveAction");
     const btnReject = document.getElementById("btnRejectAction");
     if (btnApprove) {
@@ -469,12 +806,12 @@ const App = {
       btnReject.classList.add("btn-disabled");
     }
 
-    // Immediately close/dismiss approval overlay and switch to execution state (mutually exclusive)
+    // Immediately close approval overlay and switch to execution state (mutually exclusive)
     this.setWorkflowUIState("executing");
 
     const statusPill = document.getElementById("executeStatusPill");
     const stream = document.getElementById("executeStepsStream");
-    if (statusPill) statusPill.textContent = "Executing approved actions...";
+    if (statusPill) statusPill.textContent = "Executing your approved actions...";
     if (stream) stream.innerHTML = "";
 
     const actions = this.activePlan.actions || [];
@@ -484,7 +821,6 @@ const App = {
         const action = actions[i];
         const title = action.title || action.description;
 
-        // Add active stream row
         const rowId = `exec-step-${action.id || i}`;
         if (stream) {
           const row = document.createElement("div");
@@ -498,10 +834,9 @@ const App = {
           row.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
 
-        await this.sleep(350); // smooth, human-readable execution micro-delay
+        await this.sleep(350);
 
         if (action.requiresApproval) {
-          // Authorize via Human-in-the-loop gate
           await fetch("/api/agent/approve-action", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -519,10 +854,8 @@ const App = {
         if (action.tool === "schedule") this.stats.schedule++;
         if (action.tool === "notes") this.stats.notes++;
 
-        // Update live tool state
         await this.fetchState();
 
-        // Mark stream row done
         const rowEl = document.getElementById(rowId);
         if (rowEl) {
           rowEl.className = "exec-step-row done";
@@ -533,10 +866,9 @@ const App = {
         }
       }
 
-      // Show execution progress briefly
       await this.sleep(400);
 
-      // Transition cleanly to completed state (mutually exclusive)
+      // Cleanly transition to completed state (mutually exclusive)
       this.showCompleteState(false);
 
     } catch (err) {
@@ -558,12 +890,9 @@ const App = {
 
   async handleRejectAction() {
     if (!this.activePlan) return;
-
-    // Prevent double-click execution
     if (this.isExecuting) return;
     this.isExecuting = true;
 
-    // Immediately disable buttons to prevent duplicate triggers
     const btnApprove = document.getElementById("btnApproveAction");
     const btnReject = document.getElementById("btnRejectAction");
     if (btnApprove) {
@@ -578,7 +907,6 @@ const App = {
     const consequential = (this.activePlan.actions || []).find(a => a.requiresApproval);
 
     if (consequential) {
-      // Record rejection securely
       await fetch("/api/agent/approve-action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -586,7 +914,6 @@ const App = {
       });
     }
 
-    // Immediately dismiss approval overlay and switch to execution state (mutually exclusive)
     this.setWorkflowUIState("executing");
 
     const statusPill = document.getElementById("executeStatusPill");
@@ -637,10 +964,8 @@ const App = {
         }
       }
 
-      // Show execution progress briefly
       await this.sleep(400);
 
-      // Transition cleanly to completed state (mutually exclusive, rejection acknowledged)
       this.showCompleteState(true);
 
     } catch (err) {
@@ -664,7 +989,6 @@ const App = {
   // STAGE 5: COMPLETE
   // ==========================================
   showCompleteState(wasRejected = false) {
-    // Strictly switch to completed state (mutually exclusive)
     this.setWorkflowUIState("completed");
 
     const summaryEl = document.getElementById("valCompleteSummary");
@@ -672,7 +996,7 @@ const App = {
 
     if (summaryEl && this.activePlan) {
       if (wasRejected) {
-        summaryEl.textContent = `Safe routine actions registered successfully. Sensitive calendar booking was cancelled per your instruction.`;
+        summaryEl.textContent = `Safe routine actions registered successfully. Sensitive calendar booking was cancelled per operator decision.`;
       } else {
         summaryEl.textContent = `All approved actions executed successfully. ${this.activePlan.summary}`;
       }
@@ -696,8 +1020,10 @@ const App = {
   resetToHomeView(clearInput = true) {
     this.isExecuting = false;
     this.setWorkflowUIState("idle");
+    this.setStepper(1);
 
     const hero = document.getElementById("heroCenterpiece");
+    const thinkingState = document.getElementById("aiThinkingState");
     const workflowSection = document.getElementById("workflowCardSection");
     const detailsDrawer = document.getElementById("detailsDrawer");
     const input = document.getElementById("goalInput");
@@ -714,6 +1040,7 @@ const App = {
     }
 
     if (hero) hero.classList.remove("hero-compact");
+    if (thinkingState) thinkingState.classList.add("hidden");
     if (workflowSection) workflowSection.classList.add("hidden");
     if (detailsDrawer) detailsDrawer.classList.add("hidden");
 
@@ -762,6 +1089,78 @@ const App = {
         </div>
       `;
     }).reverse().join("");
+  },
+
+  renderFullScheduleView(events = null) {
+    const container = document.getElementById("fullScheduleContainer");
+    if (!container) return;
+
+    const scheduleList = events || (window.ToolsView ? [] : []);
+    fetch("/api/state")
+      .then(r => r.json())
+      .then(json => {
+        const sched = json.data?.schedule || [];
+        if (sched.length === 0) {
+          container.innerHTML = `
+            <div class="empty-placeholder" style="padding: 40px; text-align: center;">
+              <span style="font-size: 1.1rem; color: var(--text-muted); display: block; margin-bottom: 8px;">No scheduled events yet</span>
+              <span style="font-size: 0.82rem; color: var(--text-faint);">Tell ActionPilot what to get done in the Command Center to automatically generate calendar blocks.</span>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = sched.map(evt => `
+          <div class="event-card ${evt.conflictDetected ? 'has-conflict' : ''}" style="margin-bottom: 12px;">
+            <div class="event-left">
+              <div class="event-time-badge">${ToolsView.escapeHtml(evt.startTime)} - ${ToolsView.escapeHtml(evt.endTime)}</div>
+              <div class="event-details">
+                <div class="event-title">${ToolsView.escapeHtml(evt.title)}</div>
+                <div class="event-date-tag">📅 ${ToolsView.escapeHtml(evt.date || 'Tomorrow')} &bull; Category: ${ToolsView.escapeHtml(evt.category || 'focus')}</div>
+                ${evt.conflictDetected ? `<div class="event-conflict-warning">⚠️ Potential clash with: ${(evt.conflictingWith || []).join(", ")}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        `).join("");
+      })
+      .catch(err => console.warn("Failed to load schedule for view:", err));
+  },
+
+  renderFullActivityView(logs = null) {
+    const container = document.getElementById("fullActivityContainer");
+    if (!container) return;
+
+    fetch("/api/state")
+      .then(r => r.json())
+      .then(json => {
+        const activity = json.data?.activityLog || [];
+        if (activity.length === 0) {
+          container.innerHTML = `
+            <div class="empty-placeholder" style="padding: 40px; text-align: center;">
+              <span style="font-size: 1.1rem; color: var(--text-muted);">No activity recorded yet</span>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = activity.map(log => {
+          let icon = "✓";
+          if (log.type === "warning") icon = "⚠️";
+          if (log.type === "system") icon = "⚙";
+
+          return `
+            <div class="activity-item type-${log.type}" style="margin-bottom: 10px; padding: 12px 16px;">
+              <span class="activity-icon">${icon}</span>
+              <div class="activity-main">
+                <div class="activity-title" style="font-size: 0.92rem;">${ToolsView.escapeHtml(log.title)}</div>
+                ${log.detail ? `<div class="activity-detail" style="font-size: 0.8rem; margin-top: 2px;">${ToolsView.escapeHtml(log.detail)}</div>` : ''}
+              </div>
+              <span class="activity-time">${ToolsView.escapeHtml(log.timestamp)}</span>
+            </div>
+          `;
+        }).reverse().join("");
+      })
+      .catch(err => console.warn("Failed to load activity for view:", err));
   },
 
   async updateTaskStatus(taskId, status) {

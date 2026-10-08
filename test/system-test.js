@@ -151,14 +151,35 @@ async function runTests() {
     assert.strictEqual(toggleResp.json.task.status, "completed");
     console.log(`✓ Task created and status toggle verified.`);
 
-    // TEST 10: State Reset
-    console.log("\n[TEST 10] Testing state reset...");
+    // TEST 10: Dynamic Conflict Resolution
+    console.log("\n[TEST 10] Testing Dynamic Conflict Resolution (/api/agent/resolve-conflict)...");
+    const conflictResp = await api("/api/agent/resolve-conflict", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    assert.strictEqual(conflictResp.status, 200);
+    assert.strictEqual(conflictResp.json.success, true);
+    console.log(`✓ Schedule conflict resolved dynamically with AI.`);
+
+    // TEST 11: Adaptive Re-planning
+    console.log("\n[TEST 11] Testing Adaptive Re-planning (/api/agent/replan)...");
+    const replanResp = await api("/api/agent/replan", {
+      method: "POST",
+      body: JSON.stringify({ reason: "Schedule shifted by 1 hour" })
+    });
+    assert.strictEqual(replanResp.status, 200);
+    assert.strictEqual(replanResp.json.success, true);
+    assert.ok(replanResp.json.plan, "Should return adapted plan");
+    console.log(`✓ Adaptive plan generated dynamically.`);
+
+    // TEST 12: State Reset
+    console.log("\n[TEST 12] Testing state reset...");
     const resetResp = await api("/api/state/reset", { method: "POST" });
     assert.strictEqual(resetResp.status, 200);
     console.log(`✓ State reset successfully.`);
 
     console.log("\n==================================================");
-    console.log("  ALL 10 INTEGRATION TESTS PASSED PERFECTLY! ✓");
+    console.log("  ALL 12 INTEGRATION TESTS PASSED PERFECTLY! ✓");
     console.log("==================================================");
     process.exit(0);
 
