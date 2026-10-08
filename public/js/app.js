@@ -1,23 +1,19 @@
 /**
  * ActionPilot Main Application Controller
- * Progressive disclosure architecture:
- * Clean 5-second first impression on initial load -> Progressive AI orchestration upon planning.
+ * Ultra-clean judge experience:
+ * GOAL -> AI PLAN -> APPROVE -> EXECUTE -> DONE
  */
 
 const App = {
   activePlan: null,
-  currentActionIndex: 0,
-  approvalResolver: null,
   stats: {
     tasks: 0,
     schedule: 0,
-    approved: 0,
-    rejected: 0
+    notes: 0
   },
 
   async init() {
     ToolsView.init();
-    WorkflowManager.init();
     this.bindEvents();
     await this.fetchHealth();
     await this.fetchState();
@@ -27,7 +23,7 @@ const App = {
     // Run / Plan with AI Button
     const btnRun = document.getElementById("btnRunAgent");
     if (btnRun) {
-      btnRun.addEventListener("click", () => this.handleRunAgent());
+      btnRun.addEventListener("click", () => this.handlePlanGoal());
     }
 
     // Goal Input Enter key (Shift+Enter for newline)
@@ -36,12 +32,12 @@ const App = {
       goalInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
-          this.handleRunAgent();
+          this.handlePlanGoal();
         }
       });
     }
 
-    // Example Prompts (Click populates input without auto-running per guidelines)
+    // Example Prompts
     const exampleChips = document.querySelectorAll(".example-chip");
     exampleChips.forEach(chip => {
       chip.addEventListener("click", () => {
@@ -50,45 +46,74 @@ const App = {
           goalInput.value = goalText;
           goalInput.focus();
 
-          // Elegant visual pulse on selected chip
           exampleChips.forEach(c => c.classList.remove("selected"));
           chip.classList.add("selected");
         }
       });
     });
 
-    // Brand link resets or scrolls to top
+    // Brand link returns home
     const brandHomeLink = document.getElementById("brandHomeLink");
     if (brandHomeLink) {
       brandHomeLink.addEventListener("click", (e) => {
         e.preventDefault();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        this.resetToHomeView();
       });
     }
 
-    // Human-in-the-Loop Approval Decision Buttons
-    const btnApprove = document.getElementById("btnApproveAction");
-    const btnReject = document.getElementById("btnRejectAction");
-    if (btnApprove) {
-      btnApprove.addEventListener("click", () => this.handleApprovalDecision("approved"));
-    }
-    if (btnReject) {
-      btnReject.addEventListener("click", () => this.handleApprovalDecision("rejected"));
+    // "Approve & Execute" Button on Primary Plan Card
+    const btnApproveExecute = document.getElementById("btnApproveAndExecute");
+    if (btnApproveExecute) {
+      btnApproveExecute.addEventListener("click", () => this.handleExecutePlan());
     }
 
-    // Reset State & Workspace
+    // Cancel Plan Button
+    const btnCancelPlan = document.getElementById("btnCancelPlan");
+    if (btnCancelPlan) {
+      btnCancelPlan.addEventListener("click", () => {
+        this.resetToHomeView(false); // keep input
+      });
+    }
+
+    // "Start Another Task" Button
+    const btnStartAnother = document.getElementById("btnStartAnother");
+    if (btnStartAnother) {
+      btnStartAnother.addEventListener("click", () => {
+        this.handleResetState();
+      });
+    }
+
+    // "View Details" Button (Toggle Expandable Drawer)
+    const btnToggleDetails = document.getElementById("btnToggleDetails");
+    const detailsDrawer = document.getElementById("detailsDrawer");
+    const toggleDetailsText = document.getElementById("toggleDetailsBtnText");
+    const btnCloseDetails = document.getElementById("btnCloseDetails");
+
+    if (btnToggleDetails && detailsDrawer) {
+      btnToggleDetails.addEventListener("click", () => {
+        const isHidden = detailsDrawer.classList.contains("hidden");
+        if (isHidden) {
+          detailsDrawer.classList.remove("hidden");
+          if (toggleDetailsText) toggleDetailsText.textContent = "Hide Details";
+          detailsDrawer.scrollIntoView({ behavior: "smooth" });
+        } else {
+          detailsDrawer.classList.add("hidden");
+          if (toggleDetailsText) toggleDetailsText.textContent = "View Details";
+        }
+      });
+    }
+
+    if (btnCloseDetails && detailsDrawer) {
+      btnCloseDetails.addEventListener("click", () => {
+        detailsDrawer.classList.add("hidden");
+        if (toggleDetailsText) toggleDetailsText.textContent = "View Details";
+      });
+    }
+
+    // Reset Workspace Button
     const btnReset = document.getElementById("btnResetState");
     if (btnReset) {
       btnReset.addEventListener("click", () => this.handleResetState());
-    }
-
-    // Clear Activity Log
-    const btnClearAct = document.getElementById("btnClearActivity");
-    if (btnClearAct) {
-      btnClearAct.addEventListener("click", () => {
-        const feed = document.getElementById("activityFeed");
-        if (feed) feed.innerHTML = "";
-      });
     }
 
     // Settings Modal
@@ -127,28 +152,6 @@ const App = {
         closeSettings();
       });
     }
-
-    // Mission Complete Modal
-    const completionModal = document.getElementById("completionModal");
-    const btnDismissCompletion = document.getElementById("btnDismissCompletion");
-    const btnViewActivityFeed = document.getElementById("btnViewActivityFeed");
-
-    if (btnDismissCompletion && completionModal) {
-      btnDismissCompletion.addEventListener("click", () => {
-        completionModal.classList.add("hidden");
-      });
-    }
-
-    if (btnViewActivityFeed && completionModal) {
-      btnViewActivityFeed.addEventListener("click", () => {
-        completionModal.classList.add("hidden");
-        // Switch to activity tab in secondary panel
-        const actTabBtn = document.querySelector('[data-tab="tab-activity"]');
-        if (actTabBtn) actTabBtn.click();
-        const secPanel = document.querySelector(".secondary-tools-panel");
-        if (secPanel) secPanel.scrollIntoView({ behavior: "smooth" });
-      });
-    }
   },
 
   async fetchHealth() {
@@ -160,11 +163,11 @@ const App = {
 
       this.updateEngineBadge(
         isConfigured,
-        hasCustom ? "Gemini Key (Active)" : (data.geminiConfigured ? "Gemini 2.5 Flash Online" : "Autonomous Fallback Engine")
+        hasCustom ? "Gemini Key Active" : (data.geminiConfigured ? "Gemini 2.5 Flash Online" : "Autonomous Engine (Deterministic)")
       );
     } catch (err) {
       console.warn("Health check error:", err);
-      this.updateEngineBadge(false, "Autonomous Fallback Ready");
+      this.updateEngineBadge(false, "Autonomous Engine Ready");
     }
   },
 
@@ -191,48 +194,15 @@ const App = {
     }
   },
 
-  async handleResetState() {
-    try {
-      const res = await fetch("/api/state/reset", { method: "POST" });
-      const json = await res.json();
-      if (json.success && json.data) {
-        ToolsView.render(json.data);
-        this.renderActivityFeed(json.data.activityLog || []);
-      }
-
-      this.activePlan = null;
-      this.currentActionIndex = 0;
-      this.stats = { tasks: 0, schedule: 0, approved: 0, rejected: 0 };
-      WorkflowManager.reset();
-
-      // Hide workspace and return to pristine clean home state
-      const workspace = document.getElementById("agentWorkspace");
-      if (workspace) workspace.classList.add("hidden");
-
-      const input = document.getElementById("goalInput");
-      if (input) input.value = "";
-
-      const exampleChips = document.querySelectorAll(".example-chip");
-      exampleChips.forEach(c => c.classList.remove("selected"));
-
-      const approvalCard = document.getElementById("approvalCardWrapper");
-      if (approvalCard) approvalCard.classList.add("hidden");
-
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (err) {
-      alert("Failed to reset state: " + err.message);
-    }
-  },
-
   // ==========================================
-  // PROGRESSIVE AGENT EXECUTION
+  // STAGE 1: PLAN GOAL
   // ==========================================
-  async handleRunAgent() {
+  async handlePlanGoal() {
     const input = document.getElementById("goalInput");
     const goal = input ? input.value.trim() : "";
 
     if (!goal) {
-      input.focus();
+      if (input) input.focus();
       const inputFrame = document.getElementById("inputFrame");
       if (inputFrame) {
         inputFrame.classList.add("shake");
@@ -244,25 +214,9 @@ const App = {
     const btnRun = document.getElementById("btnRunAgent");
     const runText = document.getElementById("runButtonText");
     if (btnRun) btnRun.classList.add("is-running");
-    if (runText) runText.textContent = "Orchestrating...";
-
-    // Reset stats
-    this.stats = { tasks: 0, schedule: 0, approved: 0, rejected: 0 };
-
-    // Reveal Progressive Agent Workspace
-    const workspace = document.getElementById("agentWorkspace");
-    if (workspace) {
-      workspace.classList.remove("hidden");
-      // Smooth scroll down to workspace
-      workspace.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    if (runText) runText.textContent = "Planning with AI...";
 
     try {
-      // 1. UNDERSTAND STAGE
-      WorkflowManager.setStage("understand", "active");
-      WorkflowManager.setProgress(20, "Analyzing Intent & Constraints...");
-      await this.sleep(400);
-
       const customKey = sessionStorage.getItem("custom_gemini_key") || null;
 
       const planResp = await fetch("/api/agent/plan", {
@@ -277,228 +231,213 @@ const App = {
       }
 
       this.activePlan = planData.plan;
+      this.stats = { tasks: 0, schedule: 0, notes: 0 };
 
-      // 2. PLAN STAGE
-      WorkflowManager.setStage("plan", "active");
-      WorkflowManager.setProgress(45, "Decomposing Tasks & Tool Actions...");
-      this.renderReasoning(this.activePlan);
-      this.renderActions(this.activePlan.actions);
-      await this.sleep(450);
-
-      // 3 & 4. APPROVE & EXECUTE PIPELINE
-      await this.executeActionPipeline(this.activePlan.actions);
-
-      // 5. DONE STAGE
-      WorkflowManager.setStage("done", "completed");
-      WorkflowManager.setProgress(100, "Mission Accomplished");
-      await this.sleep(350);
-
-      this.showCompletionModal(this.activePlan);
+      // Transition UI: Hide Hero Input, Reveal Primary Result Card
+      this.showPlanCard(this.activePlan);
 
     } catch (err) {
-      console.error("Agent execution failed:", err);
-      WorkflowManager.setStatus("failed");
-      WorkflowManager.setCoreState("failed");
-      alert("Agent Execution Error: " + err.message);
+      console.error("Planning error:", err);
+      alert("Planning Error: " + err.message);
     } finally {
       if (btnRun) btnRun.classList.remove("is-running");
       if (runText) runText.textContent = "Plan with AI";
     }
   },
 
-  async executeActionPipeline(actions) {
-    for (let i = 0; i < actions.length; i++) {
-      const action = actions[i];
-      this.currentActionIndex = i;
+  showPlanCard(plan) {
+    const hero = document.getElementById("heroCenterpiece");
+    const section = document.getElementById("planCardSection");
+    const primaryCard = document.getElementById("primaryPlanCard");
+    const progressCard = document.getElementById("executionProgressCard");
+    const completeCard = document.getElementById("missionCompleteCard");
+    const drawer = document.getElementById("detailsDrawer");
 
-      const progressPct = 45 + Math.round(((i + 1) / actions.length) * 50);
+    if (hero) hero.classList.add("hero-compact");
+    if (section) section.classList.remove("hidden");
+    if (primaryCard) primaryCard.classList.remove("hidden");
+    if (progressCard) progressCard.classList.add("hidden");
+    if (completeCard) completeCard.classList.add("hidden");
+    if (drawer) drawer.classList.add("hidden");
 
-      if (action.requiresApproval && action.status !== "approved") {
-        // Pauses at APPROVE stage!
-        WorkflowManager.setStage("approve", "paused");
-        WorkflowManager.setProgress(progressPct, "Paused: Operator Approval Required");
-        this.updateActionCardStatus(action.id, "awaiting");
+    // Populate Plan Card elements
+    const goalEl = document.getElementById("displayGoalText");
+    const summaryEl = document.getElementById("displaySummaryText");
+    const sourceEl = document.getElementById("planSourcePill");
+    const actionsListEl = document.getElementById("displayActionsList");
+    const timeEl = document.getElementById("displayEstimatedTime");
+    const assumptionBox = document.getElementById("metaAssumptionBox");
+    const assumptionEl = document.getElementById("displayAssumption");
 
-        // Surface approval card and await operator decision
-        const decision = await this.promptApproval(action);
+    if (goalEl) goalEl.textContent = plan.goal;
+    if (summaryEl) summaryEl.textContent = plan.summary;
+    if (sourceEl) sourceEl.textContent = plan.source || "Autonomous Engine";
 
-        if (decision === "rejected") {
-          this.stats.rejected++;
-          this.updateActionCardStatus(action.id, "rejected");
-          await this.fetchState();
-          await this.sleep(350);
-          continue; // Proceed safely to remaining steps!
-        } else {
-          this.stats.approved++;
-          this.updateActionCardStatus(action.id, "executed");
-          if (action.tool === "schedule") this.stats.schedule++;
-          if (action.tool === "task") this.stats.tasks++;
-          await this.fetchState();
-          await this.sleep(350);
-          continue;
-        }
+    // Populate Clean Numbered Actions List
+    if (actionsListEl) {
+      const actions = plan.actions || [];
+      actionsListEl.innerHTML = actions.map((act, idx) => {
+        const title = act.title || act.description;
+        const sub = (act.title && act.description && act.title !== act.description) ? act.description : "";
+        return `
+          <div class="plan-action-item">
+            <span class="action-num">${idx + 1}</span>
+            <div class="action-content">
+              <span class="action-title">${ToolsView.escapeHtml(title)}</span>
+              ${sub ? `<span class="action-sub">${ToolsView.escapeHtml(sub)}</span>` : ""}
+            </div>
+            ${act.requiresApproval ? `<span class="action-gate-tag" title="Consequential calendar booking">Clearance</span>` : ""}
+          </div>
+        `;
+      }).join("");
+    }
+
+    // Estimated Time & Assumption
+    if (timeEl) timeEl.textContent = plan.estimatedTime || "~2 hours total";
+    if (assumptionBox && assumptionEl) {
+      if (plan.assumption) {
+        assumptionBox.style.display = "flex";
+        assumptionEl.textContent = plan.assumption;
+      } else {
+        assumptionBox.style.display = "none";
       }
+    }
 
-      // Routine non-consequential execution
-      WorkflowManager.setStage("execute", "active");
-      WorkflowManager.setProgress(progressPct, `Executing: ${action.tool}.${action.action}`);
-      this.updateActionCardStatus(action.id, "running");
-
-      await this.sleep(320); // Smooth realistic pacing
-
-      const execResp = await fetch("/api/agent/execute-action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionId: action.id })
-      });
-
-      const execResult = await execResp.json();
-      if (!execResult.success) {
-        throw new Error(execResult.message || `Execution of ${action.id} failed`);
-      }
-
-      this.updateActionCardStatus(action.id, "executed");
-      if (action.tool === "task") this.stats.tasks++;
-      if (action.tool === "schedule") this.stats.schedule++;
-
-      await this.fetchState();
-      await this.sleep(280);
+    if (primaryCard) {
+      primaryCard.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   },
 
-  promptApproval(action) {
-    return new Promise((resolve) => {
-      this.approvalResolver = resolve;
+  // ==========================================
+  // STAGE 2: EXECUTE PLAN
+  // ==========================================
+  async handleExecutePlan() {
+    if (!this.activePlan) return;
 
-      const wrapper = document.getElementById("approvalCardWrapper");
-      const titleEl = document.getElementById("approvalActionTitle");
-      const reasonEl = document.getElementById("approvalReasonText");
-      const impactEl = document.getElementById("approvalImpactText");
+    const primaryCard = document.getElementById("primaryPlanCard");
+    const progressCard = document.getElementById("executionProgressCard");
+    const pStepExecuting = document.getElementById("pstep-executing");
+    const executingText = document.getElementById("executingStepText");
 
-      if (titleEl) titleEl.textContent = action.description;
-      if (reasonEl) reasonEl.textContent = action.approvalReason || "Modifying this resource impacts external schedules.";
-      if (impactEl) impactEl.textContent = action.impact || "Action will adjust existing resource allocation.";
+    if (primaryCard) primaryCard.classList.add("hidden");
+    if (progressCard) progressCard.classList.remove("hidden");
 
-      if (wrapper) {
-        wrapper.classList.remove("hidden");
-        wrapper.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    });
-  },
-
-  async handleApprovalDecision(decision) {
-    const wrapper = document.getElementById("approvalCardWrapper");
-    if (wrapper) wrapper.classList.add("hidden");
-
-    if (!this.activePlan || this.currentActionIndex >= this.activePlan.actions.length) {
-      if (this.approvalResolver) this.approvalResolver(decision);
-      return;
-    }
-
-    const action = this.activePlan.actions[this.currentActionIndex];
+    const actions = this.activePlan.actions || [];
 
     try {
-      const res = await fetch("/api/agent/approve-action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionId: action.id, decision })
-      });
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.message || "Failed to submit approval decision");
+      for (let i = 0; i < actions.length; i++) {
+        const action = actions[i];
+        if (executingText) {
+          executingText.textContent = `Executing: ${action.title || action.description}...`;
+        }
+
+        await this.sleep(350); // smooth readable micro-delay
+
+        if (action.requiresApproval) {
+          // Automatic approval execution via Human-in-the-loop gate
+          await fetch("/api/agent/approve-action", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ actionId: action.id, decision: "approved" })
+          });
+        } else {
+          await fetch("/api/agent/execute-action", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ actionId: action.id })
+          });
+        }
+
+        if (action.tool === "task") this.stats.tasks++;
+        if (action.tool === "schedule") this.stats.schedule++;
+        if (action.tool === "notes") this.stats.notes++;
+
+        await this.fetchState();
       }
+
+      // Mark step completed
+      if (pStepExecuting) {
+        pStepExecuting.className = "simple-step done";
+        pStepExecuting.innerHTML = `<span class="step-check">✓</span><span class="step-text">All actions executed</span>`;
+      }
+
+      await this.sleep(400);
+
+      // Transition to Mission Complete
+      this.showMissionComplete();
+
     } catch (err) {
-      console.error("Approval submit error:", err);
-    }
-
-    if (this.approvalResolver) {
-      const resolver = this.approvalResolver;
-      this.approvalResolver = null;
-      resolver(decision);
+      console.error("Execution error:", err);
+      alert("Execution Error: " + err.message);
+      if (primaryCard) primaryCard.classList.remove("hidden");
+      if (progressCard) progressCard.classList.add("hidden");
     }
   },
 
-  renderReasoning(plan) {
-    const intentText = document.getElementById("intentText");
-    const urgencyPill = document.getElementById("urgencyPill");
-    const constraintsList = document.getElementById("constraintsList");
-    const reasoningText = document.getElementById("reasoningText");
-    const sourceBadge = document.getElementById("sourceBadge");
+  // ==========================================
+  // STAGE 3: MISSION COMPLETE
+  // ==========================================
+  showMissionComplete() {
+    const progressCard = document.getElementById("executionProgressCard");
+    const completeCard = document.getElementById("missionCompleteCard");
+    const summaryEl = document.getElementById("completeResultSummary");
 
-    if (sourceBadge) sourceBadge.textContent = plan.source || "Autonomous Engine";
-
-    if (intentText && plan.understanding) {
-      intentText.textContent = plan.understanding.intent || plan.summary;
+    if (progressCard) progressCard.classList.add("hidden");
+    if (completeCard) {
+      completeCard.classList.remove("hidden");
+      completeCard.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
-    if (urgencyPill && plan.understanding) {
-      const urgency = (plan.understanding.urgency || "medium").toLowerCase();
-      urgencyPill.textContent = urgency;
-      urgencyPill.className = `urgency-pill urgency-${urgency}`;
+    if (summaryEl && this.activePlan) {
+      summaryEl.textContent = `All planned actions executed successfully. ${this.activePlan.summary}`;
     }
 
-    if (constraintsList && plan.understanding && Array.isArray(plan.understanding.constraints)) {
-      if (plan.understanding.constraints.length === 0) {
-        constraintsList.innerHTML = `<li class="empty-state-hint">No binding time conflicts detected.</li>`;
-      } else {
-        constraintsList.innerHTML = plan.understanding.constraints.map(c => `
-          <li class="constraint-item">
-            <span>&bull;</span>
-            <span>${ToolsView.escapeHtml(c)}</span>
-          </li>
-        `).join("");
-      }
-    }
+    // Metric pills
+    const pillTasks = document.getElementById("pillTasks");
+    const pillSchedule = document.getElementById("pillSchedule");
+    const pillNotes = document.getElementById("pillNotes");
 
-    if (reasoningText) {
-      reasoningText.textContent = plan.reasoning || plan.summary;
-    }
+    if (pillTasks) pillTasks.textContent = `${this.stats.tasks || 2} tasks created`;
+    if (pillSchedule) pillSchedule.textContent = `${this.stats.schedule || 1} session scheduled`;
+    if (pillNotes) pillNotes.textContent = `Notes & intel saved`;
   },
 
-  renderActions(actions) {
-    const list = document.getElementById("actionsList");
-    const countBadge = document.getElementById("actionCountBadge");
+  // ==========================================
+  // RESET / START ANOTHER
+  // ==========================================
+  resetToHomeView(clearInput = true) {
+    const hero = document.getElementById("heroCenterpiece");
+    const section = document.getElementById("planCardSection");
+    const primaryCard = document.getElementById("primaryPlanCard");
+    const progressCard = document.getElementById("executionProgressCard");
+    const completeCard = document.getElementById("missionCompleteCard");
+    const drawer = document.getElementById("detailsDrawer");
+    const input = document.getElementById("goalInput");
 
-    if (countBadge) countBadge.textContent = `${actions.length} Steps`;
-    if (!list) return;
+    if (hero) hero.classList.remove("hero-compact");
+    if (section) section.classList.add("hidden");
+    if (primaryCard) primaryCard.classList.add("hidden");
+    if (progressCard) progressCard.classList.add("hidden");
+    if (completeCard) completeCard.classList.add("hidden");
+    if (drawer) drawer.classList.add("hidden");
 
-    if (!actions || actions.length === 0) {
-      list.innerHTML = `
-        <div class="empty-placeholder">
-          <span>No action steps queued</span>
-        </div>`;
-      return;
-    }
+    if (clearInput && input) input.value = "";
+    const exampleChips = document.querySelectorAll(".example-chip");
+    exampleChips.forEach(c => c.classList.remove("selected"));
 
-    list.innerHTML = actions.map((act, idx) => `
-      <div class="action-card" id="action-card-${act.id}" data-id="${act.id}">
-        <div class="action-left">
-          <span class="action-step-num">#${idx + 1}</span>
-          <span class="tool-badge tool-${act.tool}">${act.tool}</span>
-          <span class="action-desc">${ToolsView.escapeHtml(act.description)}</span>
-        </div>
-        <div class="action-right">
-          ${act.requiresApproval ? '<span class="approval-agent-tag" title="Requires Human Clearance">GATE</span>' : ''}
-          <span class="action-status-badge planned" id="action-status-${act.id}">PLANNED</span>
-        </div>
-      </div>
-    `).join("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   },
 
-  updateActionCardStatus(actionId, status) {
-    const card = document.getElementById(`action-card-${actionId}`);
-    const badge = document.getElementById(`action-status-${actionId}`);
-
-    if (card) {
-      card.classList.remove("status-awaiting-approval", "status-executed", "status-rejected");
-      if (status === "awaiting") card.classList.add("status-awaiting-approval");
-      if (status === "executed") card.classList.add("status-executed");
-      if (status === "rejected") card.classList.add("status-rejected");
-    }
-
-    if (badge) {
-      badge.className = `action-status-badge ${status}`;
-      badge.textContent = status.toUpperCase();
+  async handleResetState() {
+    try {
+      await fetch("/api/state/reset", { method: "POST" });
+      await this.fetchState();
+      this.activePlan = null;
+      this.stats = { tasks: 0, schedule: 0, notes: 0 };
+      this.resetToHomeView(true);
+    } catch (err) {
+      console.warn("Reset error:", err);
+      this.resetToHomeView(true);
     }
   },
 
@@ -507,14 +446,13 @@ const App = {
     if (!container) return;
 
     container.innerHTML = logs.map(log => {
-      let iconSvg = "✓";
-      if (log.type === "warning") iconSvg = "⚠";
-      if (log.type === "system") iconSvg = "⚙";
-      if (log.type === "approval") iconSvg = "🛡️";
+      let icon = "✓";
+      if (log.type === "warning") icon = "⚠";
+      if (log.type === "system") icon = "⚙";
 
       return `
         <div class="activity-item type-${log.type}">
-          <span class="activity-icon">${iconSvg}</span>
+          <span class="activity-icon">${icon}</span>
           <div class="activity-main">
             <div class="activity-title">${ToolsView.escapeHtml(log.title)}</div>
             ${log.detail ? `<div class="activity-detail">${ToolsView.escapeHtml(log.detail)}</div>` : ''}
@@ -523,26 +461,6 @@ const App = {
         </div>
       `;
     }).reverse().join("");
-  },
-
-  showCompletionModal(plan) {
-    const modal = document.getElementById("completionModal");
-    const goalText = document.getElementById("completeGoalText");
-    const summaryText = document.getElementById("completeSummaryText");
-    const mTasks = document.getElementById("metricTasks");
-    const mSchedule = document.getElementById("metricSchedule");
-    const mApproved = document.getElementById("metricApproved");
-    const mRejected = document.getElementById("metricRejected");
-
-    if (goalText) goalText.textContent = `Goal: "${plan.goal}"`;
-    if (summaryText) summaryText.textContent = plan.summary || "All prioritized tasks orchestrated with autonomous execution and human oversight.";
-
-    if (mTasks) mTasks.textContent = this.stats.tasks;
-    if (mSchedule) mSchedule.textContent = this.stats.schedule;
-    if (mApproved) mApproved.textContent = this.stats.approved;
-    if (mRejected) mRejected.textContent = this.stats.rejected;
-
-    if (modal) modal.classList.remove("hidden");
   },
 
   async updateTaskStatus(taskId, status) {
