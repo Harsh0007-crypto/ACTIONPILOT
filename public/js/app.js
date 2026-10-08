@@ -1,11 +1,12 @@
 /**
  * ActionPilot Main Application Controller
- * Ultra-clean judge experience with 5 sequential workflow stages:
+ * Ultra-clean judge experience with 5 sequential, mutually-exclusive workflow stages:
  * UNDERSTAND -> PLAN -> APPROVE -> EXECUTE -> COMPLETE
  */
 
 const App = {
   activePlan: null,
+  isExecuting: false,
   stats: {
     tasks: 0,
     schedule: 0,
@@ -227,6 +228,55 @@ const App = {
   },
 
   // ==========================================
+  // MUTUALLY EXCLUSIVE WORKFLOW UI STATES
+  // ==========================================
+  setWorkflowUIState(state) {
+    // Strict mutual exclusivity between:
+    // 'approval' | 'executing' | 'completed' | 'idle'
+    const blockApproval = document.getElementById("blockApproval");
+    const approvalAlertCard = document.getElementById("approvalAlertCard");
+    const rejectedMsg = document.getElementById("approvalRejectedMessage");
+    const blockExecute = document.getElementById("blockExecute");
+    const blockComplete = document.getElementById("blockComplete");
+
+    if (state === "approval") {
+      // Show approval controls, hide execution and completion
+      if (blockApproval) blockApproval.classList.remove("hidden");
+      if (approvalAlertCard) approvalAlertCard.classList.remove("hidden");
+      if (rejectedMsg) rejectedMsg.classList.add("hidden");
+      if (blockExecute) blockExecute.classList.add("hidden");
+      if (blockComplete) blockComplete.classList.add("hidden");
+      this.setStepper(3);
+    } else if (state === "executing") {
+      // Immediately dismiss/close approval controls, show execution progress
+      if (blockApproval) blockApproval.classList.add("hidden");
+      if (approvalAlertCard) approvalAlertCard.classList.add("hidden");
+      if (rejectedMsg) rejectedMsg.classList.add("hidden");
+      if (blockExecute) blockExecute.classList.remove("hidden");
+      if (blockComplete) blockComplete.classList.add("hidden");
+      this.setStepper(4);
+    } else if (state === "completed") {
+      // Ensure approval and execution are completely dismissed, show completion
+      if (blockApproval) blockApproval.classList.add("hidden");
+      if (approvalAlertCard) approvalAlertCard.classList.add("hidden");
+      if (rejectedMsg) rejectedMsg.classList.add("hidden");
+      if (blockExecute) blockExecute.classList.add("hidden");
+      if (blockComplete) {
+        blockComplete.classList.remove("hidden");
+        blockComplete.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      this.setStepper(5);
+    } else {
+      // 'idle' / initial / reset state: hide all 3
+      if (blockApproval) blockApproval.classList.add("hidden");
+      if (approvalAlertCard) approvalAlertCard.classList.add("hidden");
+      if (rejectedMsg) rejectedMsg.classList.add("hidden");
+      if (blockExecute) blockExecute.classList.add("hidden");
+      if (blockComplete) blockComplete.classList.add("hidden");
+    }
+  },
+
+  // ==========================================
   // STAGES 1 & 2: UNDERSTAND + PLAN
   // ==========================================
   async handlePlanGoal() {
@@ -265,7 +315,7 @@ const App = {
       this.activePlan = planData.plan;
       this.stats = { tasks: 0, schedule: 0, notes: 0 };
 
-      // Render Stage 1 (Understand) & Stage 2 (Plan) & Reveal Approval card
+      // Render Stage 1 (Understand) & Stage 2 (Plan) & Transition to Stage 3 (Approve)
       this.renderPlanWorkflow(this.activePlan);
 
     } catch (err) {
@@ -278,16 +328,26 @@ const App = {
   },
 
   renderPlanWorkflow(plan) {
+    this.isExecuting = false;
+
     const hero = document.getElementById("heroCenterpiece");
     const workflowSection = document.getElementById("workflowCardSection");
-    const blockExecute = document.getElementById("blockExecute");
-    const blockComplete = document.getElementById("blockComplete");
     const detailsDrawer = document.getElementById("detailsDrawer");
+    const btnApprove = document.getElementById("btnApproveAction");
+    const btnReject = document.getElementById("btnRejectAction");
+
+    // Re-enable buttons
+    if (btnApprove) {
+      btnApprove.disabled = false;
+      btnApprove.classList.remove("btn-disabled");
+    }
+    if (btnReject) {
+      btnReject.disabled = false;
+      btnReject.classList.remove("btn-disabled");
+    }
 
     if (hero) hero.classList.add("hero-compact");
     if (workflowSection) workflowSection.classList.remove("hidden");
-    if (blockExecute) blockExecute.classList.add("hidden");
-    if (blockComplete) blockComplete.classList.add("hidden");
     if (detailsDrawer) detailsDrawer.classList.add("hidden");
 
     // Reset details drawer button text
@@ -352,23 +412,33 @@ const App = {
       }).join("");
     }
 
-    // 3. POPULATE APPROVAL BLOCK
+    // 3. POPULATE APPROVAL BLOCK & SET MUTUALLY EXCLUSIVE STATE
     const approvalCard = document.getElementById("approvalAlertCard");
     const reasonText = document.getElementById("valApprovalReason");
-    const rejectedMsg = document.getElementById("approvalRejectedMessage");
-
-    if (rejectedMsg) rejectedMsg.classList.add("hidden");
-
     const consequential = (plan.actions || []).find(a => a.requiresApproval);
+
     if (consequential) {
-      if (approvalCard) approvalCard.classList.remove("hidden");
       if (reasonText) {
         reasonText.textContent = consequential.approvalReason || consequential.description;
       }
-      this.setStepper(3); // Stage 3: Approve
+      const headline = approvalCard ? approvalCard.querySelector(".approval-headline") : null;
+      if (headline) headline.textContent = "HUMAN APPROVAL REQUIRED";
+      const approveText = btnApprove ? btnApprove.querySelector("span") : null;
+      if (approveText) approveText.textContent = "Approve & Execute";
+      if (btnReject) btnReject.classList.remove("hidden");
+
+      this.setWorkflowUIState("approval");
     } else {
-      if (approvalCard) approvalCard.classList.add("hidden");
-      this.setStepper(2); // Stage 2: Plan
+      if (reasonText) {
+        reasonText.textContent = "All planned actions are routine and verified safe. Ready for execution.";
+      }
+      const headline = approvalCard ? approvalCard.querySelector(".approval-headline") : null;
+      if (headline) headline.textContent = "READY FOR EXECUTION";
+      const approveText = btnApprove ? btnApprove.querySelector("span") : null;
+      if (approveText) approveText.textContent = "Execute Plan";
+      if (btnReject) btnReject.classList.add("hidden");
+
+      this.setWorkflowUIState("approval");
     }
 
     // Smooth scroll to workflow card
@@ -383,13 +453,27 @@ const App = {
   async handleApproveAndExecute() {
     if (!this.activePlan) return;
 
-    this.setStepper(4); // Stage 4: Execute
+    // Prevent double-click execution
+    if (this.isExecuting) return;
+    this.isExecuting = true;
 
-    const blockExecute = document.getElementById("blockExecute");
+    // Immediately disable buttons to prevent duplicate triggers
+    const btnApprove = document.getElementById("btnApproveAction");
+    const btnReject = document.getElementById("btnRejectAction");
+    if (btnApprove) {
+      btnApprove.disabled = true;
+      btnApprove.classList.add("btn-disabled");
+    }
+    if (btnReject) {
+      btnReject.disabled = true;
+      btnReject.classList.add("btn-disabled");
+    }
+
+    // Immediately close/dismiss approval overlay and switch to execution state (mutually exclusive)
+    this.setWorkflowUIState("executing");
+
     const statusPill = document.getElementById("executeStatusPill");
     const stream = document.getElementById("executeStepsStream");
-
-    if (blockExecute) blockExecute.classList.remove("hidden");
     if (statusPill) statusPill.textContent = "Executing approved actions...";
     if (stream) stream.innerHTML = "";
 
@@ -449,25 +533,47 @@ const App = {
         }
       }
 
+      // Show execution progress briefly
       await this.sleep(400);
 
-      // Transition to Stage 5: Complete
+      // Transition cleanly to completed state (mutually exclusive)
       this.showCompleteState(false);
 
     } catch (err) {
       console.error("Execution error:", err);
       alert("Execution Error: " + err.message);
+      this.setWorkflowUIState("approval");
+    } finally {
+      this.isExecuting = false;
+      if (btnApprove) {
+        btnApprove.disabled = false;
+        btnApprove.classList.remove("btn-disabled");
+      }
+      if (btnReject) {
+        btnReject.disabled = false;
+        btnReject.classList.remove("btn-disabled");
+      }
     }
   },
 
   async handleRejectAction() {
     if (!this.activePlan) return;
 
-    const approvalCard = document.getElementById("approvalAlertCard");
-    const rejectedMsg = document.getElementById("approvalRejectedMessage");
-    const blockExecute = document.getElementById("blockExecute");
-    const statusPill = document.getElementById("executeStatusPill");
-    const stream = document.getElementById("executeStepsStream");
+    // Prevent double-click execution
+    if (this.isExecuting) return;
+    this.isExecuting = true;
+
+    // Immediately disable buttons to prevent duplicate triggers
+    const btnApprove = document.getElementById("btnApproveAction");
+    const btnReject = document.getElementById("btnRejectAction");
+    if (btnApprove) {
+      btnApprove.disabled = true;
+      btnApprove.classList.add("btn-disabled");
+    }
+    if (btnReject) {
+      btnReject.disabled = true;
+      btnReject.classList.add("btn-disabled");
+    }
 
     const consequential = (this.activePlan.actions || []).find(a => a.requiresApproval);
 
@@ -480,13 +586,12 @@ const App = {
       });
     }
 
-    if (approvalCard) approvalCard.classList.add("hidden");
-    if (rejectedMsg) rejectedMsg.classList.remove("hidden");
+    // Immediately dismiss approval overlay and switch to execution state (mutually exclusive)
+    this.setWorkflowUIState("executing");
 
-    this.setStepper(4); // Stage 4: Execute non-consequential tasks
-
-    if (blockExecute) blockExecute.classList.remove("hidden");
-    if (statusPill) statusPill.textContent = "Executing safe routine actions...";
+    const statusPill = document.getElementById("executeStatusPill");
+    const stream = document.getElementById("executeStepsStream");
+    if (statusPill) statusPill.textContent = "Executing safe routine actions (sensitive booking cancelled)...";
     if (stream) stream.innerHTML = "";
 
     const safeActions = (this.activePlan.actions || []).filter(a => !a.requiresApproval);
@@ -532,14 +637,26 @@ const App = {
         }
       }
 
+      // Show execution progress briefly
       await this.sleep(400);
 
-      // Transition to Stage 5: Complete (with rejection acknowledged)
+      // Transition cleanly to completed state (mutually exclusive, rejection acknowledged)
       this.showCompleteState(true);
 
     } catch (err) {
       console.error("Execution error on safe actions:", err);
       alert("Execution Error: " + err.message);
+      this.setWorkflowUIState("approval");
+    } finally {
+      this.isExecuting = false;
+      if (btnApprove) {
+        btnApprove.disabled = false;
+        btnApprove.classList.remove("btn-disabled");
+      }
+      if (btnReject) {
+        btnReject.disabled = false;
+        btnReject.classList.remove("btn-disabled");
+      }
     }
   },
 
@@ -547,22 +664,15 @@ const App = {
   // STAGE 5: COMPLETE
   // ==========================================
   showCompleteState(wasRejected = false) {
-    this.setStepper(5); // Stage 5: Complete
+    // Strictly switch to completed state (mutually exclusive)
+    this.setWorkflowUIState("completed");
 
-    const blockExecute = document.getElementById("blockExecute");
-    const blockComplete = document.getElementById("blockComplete");
     const summaryEl = document.getElementById("valCompleteSummary");
     const artifactsSummary = document.getElementById("valArtifactsSummary");
 
-    if (blockExecute) blockExecute.classList.add("hidden");
-    if (blockComplete) {
-      blockComplete.classList.remove("hidden");
-      blockComplete.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-
     if (summaryEl && this.activePlan) {
       if (wasRejected) {
-        summaryEl.textContent = `Safe tasks registered successfully. Sensitive calendar booking was cancelled per your instruction.`;
+        summaryEl.textContent = `Safe routine actions registered successfully. Sensitive calendar booking was cancelled per your instruction.`;
       } else {
         summaryEl.textContent = `All approved actions executed successfully. ${this.activePlan.summary}`;
       }
@@ -584,17 +694,27 @@ const App = {
   // RESET / START ANOTHER TASK
   // ==========================================
   resetToHomeView(clearInput = true) {
+    this.isExecuting = false;
+    this.setWorkflowUIState("idle");
+
     const hero = document.getElementById("heroCenterpiece");
     const workflowSection = document.getElementById("workflowCardSection");
-    const blockExecute = document.getElementById("blockExecute");
-    const blockComplete = document.getElementById("blockComplete");
     const detailsDrawer = document.getElementById("detailsDrawer");
     const input = document.getElementById("goalInput");
+    const btnApprove = document.getElementById("btnApproveAction");
+    const btnReject = document.getElementById("btnRejectAction");
+
+    if (btnApprove) {
+      btnApprove.disabled = false;
+      btnApprove.classList.remove("btn-disabled");
+    }
+    if (btnReject) {
+      btnReject.disabled = false;
+      btnReject.classList.remove("btn-disabled");
+    }
 
     if (hero) hero.classList.remove("hero-compact");
     if (workflowSection) workflowSection.classList.add("hidden");
-    if (blockExecute) blockExecute.classList.add("hidden");
-    if (blockComplete) blockComplete.classList.add("hidden");
     if (detailsDrawer) detailsDrawer.classList.add("hidden");
 
     if (clearInput && input) input.value = "";

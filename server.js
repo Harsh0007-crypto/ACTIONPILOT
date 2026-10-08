@@ -301,10 +301,12 @@ app.get("*", (req, res) => {
 });
 
 // Start server
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`=======================================================`);
   console.log(`  ACTIONPILOT AUTONOMOUS KERNEL ONLINE`);
   console.log(`  Running on: http://${HOST}:${PORT}`);
   console.log(`  Gemini Key Configured: ${!!process.env.GEMINI_API_KEY}`);
   console.log(`=======================================================`);
 });
+
+module.exports = server;

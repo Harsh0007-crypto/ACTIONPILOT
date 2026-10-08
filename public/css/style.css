@@ -55,6 +55,28 @@ html, body {
   overflow-x: hidden;
 }
 
+/* Global Hidden & Mutually Exclusive States Utility */
+.hidden,
+.workflow-block.hidden,
+.approval-block.hidden,
+.approval-alert-card.hidden,
+.approval-rejected-message.hidden,
+.execute-block.hidden,
+.complete-block.hidden,
+.workflow-card-section.hidden,
+.expandable-details-drawer.hidden,
+.modal-overlay.hidden {
+  display: none !important;
+}
+
+.btn:disabled,
+.btn.btn-disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  filter: grayscale(0.35);
+}
+
 /* Ambient Cyber Gradients & Grid */
 .bg-fx-grid {
   position: fixed;
