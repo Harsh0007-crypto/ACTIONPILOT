@@ -14,6 +14,7 @@ const stateStore = require("./lib/stateStore");
 const { executeTool } = require("./lib/toolRegistry");
 const { planWithGemini } = require("./lib/gemini");
 const { generateFallbackPlan } = require("./lib/fallbackPlanner");
+const { validateAndSynchronizePlan } = require("./lib/scheduleOptimizer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -112,6 +113,9 @@ app.post("/api/agent/plan", async (req, res) => {
     planResult = generateFallbackPlan(cleanGoal, stateStore.getState());
     source = planResult.source || "Autonomous Engine (Deterministic Fallback)";
   }
+
+  // Ensure single source of truth and canonical synchronization
+  planResult = validateAndSynchronizePlan(planResult, cleanGoal);
 
   // Ensure actions have consistent initial status
   const actions = (planResult.actions || []).map((action, index) => ({

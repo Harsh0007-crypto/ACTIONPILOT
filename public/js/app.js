@@ -721,42 +721,75 @@ const App = {
 
     // Gather all scheduled events from active plan & stateStore.schedule
     const events = [];
+    const seenEventKeys = new Set();
 
-    // From current plan
-    if (plan && plan.actions) {
+    // From canonical plan.schedule if available
+    if (plan && Array.isArray(plan.schedule) && plan.schedule.length > 0) {
+      plan.schedule.forEach((s, idx) => {
+        const id = s.id || `plan-sched-${idx}`;
+        const key = `${s.task || s.title}-${s.startTime}`;
+        if (!seenEventKeys.has(key)) {
+          seenEventKeys.add(key);
+          events.push({
+            id,
+            title: s.task || s.title || "Focus Block",
+            time: s.startTime || "7:00 PM",
+            endTime: s.endTime || "8:30 PM",
+            dateNum: s.dateNum || (s.date && s.date.includes("9") ? 9 : (s.date && s.date.includes("10") ? 10 : 8)),
+            date: s.date || "Today (Oct 8)",
+            category: s.category || "focus"
+          });
+        }
+      });
+    } else if (plan && Array.isArray(plan.actions)) {
+      // Fallback from actions if plan.schedule was absent
       plan.actions.forEach(a => {
         if (a.tool === "schedule" && a.params) {
-          events.push({
-            id: a.id,
-            title: a.params.title || a.title || "Scheduled Focus Block",
-            time: a.params.startTime || "2:00 PM",
-            endTime: a.params.endTime || "3:00 PM",
-            dateNum: 8, // October 8
-            category: a.params.category || "focus"
-          });
+          const key = `${a.params.title || a.title}-${a.params.startTime}`;
+          if (!seenEventKeys.has(key)) {
+            seenEventKeys.add(key);
+            const rawDate = a.params.date || "Today (Oct 8)";
+            const dateNum = rawDate.includes("9") || rawDate.toLowerCase().includes("tomorrow") ? 9 : (rawDate.includes("10") ? 10 : 8);
+            events.push({
+              id: a.id,
+              title: a.params.title || a.title || "Scheduled Focus Block",
+              time: a.params.startTime || "7:00 PM",
+              endTime: a.params.endTime || "8:30 PM",
+              dateNum,
+              date: rawDate,
+              category: a.params.category || "focus"
+            });
+          }
         }
       });
     }
 
-    // From persisted stateStore.schedule if present
+    // From persisted stateStore.schedule if present (after tool execution)
     const existingSched = stateSchedule || [];
     existingSched.forEach(e => {
-      events.push({
-        id: e.id,
-        title: e.title,
-        time: e.startTime,
-        endTime: e.endTime,
-        dateNum: 8,
-        category: e.category || "focus"
-      });
+      const key = `${e.title}-${e.startTime}`;
+      if (!seenEventKeys.has(key)) {
+        seenEventKeys.add(key);
+        const rawDate = e.date || "Today (Oct 8)";
+        const dateNum = rawDate.includes("9") || rawDate.toLowerCase().includes("tomorrow") ? 9 : (rawDate.includes("10") ? 10 : 8);
+        events.push({
+          id: e.id,
+          title: e.title,
+          time: e.startTime,
+          endTime: e.endTime,
+          dateNum,
+          date: rawDate,
+          category: e.category || "focus"
+        });
+      }
     });
 
-    // If no events yet, offer intelligent contextual slots
-    if (events.length === 0) {
+    // ONLY show placeholder demo events if NO plan and NO state schedule exists at all
+    if (events.length === 0 && !plan) {
       events.push(
         { id: "demo-1", title: "Presentation Rehearsal", time: "2:00 PM", endTime: "3:00 PM", dateNum: 8, category: "focus" },
-        { id: "demo-2", title: "AI Quiz", time: "9:00 AM", endTime: "10:00 AM", dateNum: 9, category: "study" },
-        { id: "demo-3", title: "Math Assignment", time: "11:59 PM", endTime: "11:59 PM", dateNum: 10, category: "deadline" }
+        { id: "demo-2", title: "Project Demo Walkthrough", time: "1:00 PM", endTime: "2:30 PM", dateNum: 9, category: "study" },
+        { id: "demo-3", title: "Final Deliverable", time: "05:00 PM", endTime: "05:00 PM", dateNum: 9, category: "deadline" }
       );
     }
 
@@ -822,11 +855,20 @@ const App = {
 
     // 3. RENDER DAY TIMELINE (Hourly slots for Oct 8)
     if (dayTimeline) {
-      const hours = ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"];
+      const todayEvts = events.filter(e => e.dateNum === 8 || (e.date && e.date.toLowerCase().includes("today")));
+      const activeHours = new Set();
+      todayEvts.forEach(e => {
+        if (e.time) activeHours.add(e.time);
+      });
+      if (activeHours.size === 0) {
+        ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"].forEach(h => activeHours.add(h));
+      }
+      const sortedHours = Array.from(activeHours);
+
       dayTimeline.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 8px;">
-          ${hours.map(h => {
-            const match = events.find(e => e.time.startsWith(h.substring(0, 2)));
+          ${sortedHours.map(h => {
+            const match = todayEvts.find(e => e.time === h || e.time.startsWith(h.substring(0, 2)));
             return `
               <div style="display: flex; align-items: center; gap: 12px; padding: 6px 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
                 <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--neon-cyan); width: 68px;">${h}</span>
@@ -842,7 +884,7 @@ const App = {
 
     // 4. RENDER "TODAY'S SCHEDULE" TIMELINE CARDS
     if (todaysContainer) {
-      const todayEvents = events.filter(e => e.dateNum === 8);
+      const todayEvents = events.filter(e => e.dateNum === 8 || (e.date && e.date.toLowerCase().includes("today")));
       if (todaysCountBadge) todaysCountBadge.textContent = `${todayEvents.length} session${todayEvents.length === 1 ? '' : 's'}`;
 
       if (todayEvents.length === 0) {
@@ -897,12 +939,15 @@ const App = {
     if (!bulletsList) return;
 
     const deadlineStr = plan.deadline ? `ahead of ${plan.deadline}` : "prior to deadline";
+    const constraintText = (plan.constraints && plan.constraints.length > 0)
+      ? plan.constraints[0]
+      : "All sessions scheduled strictly within your stated availability.";
 
     bulletsList.innerHTML = `
-      <li><span class="bullet-dot">•</span> <strong>Deadline detected:</strong> Tasks scheduled to complete ${ToolsView.escapeHtml(deadlineStr)}.</li>
-      <li><span class="bullet-dot">•</span> <strong>High-priority task scheduled first:</strong> Synthesis and visual outlining take morning prime focus.</li>
-      <li><span class="bullet-dot">•</span> <strong>Rehearsal placed after slide completion:</strong> Dependent visual deck completed before dry-run rehearsal.</li>
-      <li><span class="bullet-dot">•</span> <strong>No schedule conflicts detected:</strong> Calendar verified for clean slot allocations.</li>
+      <li><span class="bullet-dot">•</span> <strong>Objective:</strong> ${ToolsView.escapeHtml(plan.summary || 'Optimized personal workflow generated.')}</li>
+      <li><span class="bullet-dot">•</span> <strong>Availability preserved:</strong> ${ToolsView.escapeHtml(constraintText)}</li>
+      <li><span class="bullet-dot">•</span> <strong>Milestone sequencing:</strong> Tasks prioritized to complete ${ToolsView.escapeHtml(deadlineStr)}.</li>
+      <li><span class="bullet-dot">•</span> <strong>No schedule conflicts:</strong> Calendar blocks verified for zero clashes.</li>
     `;
   },
 

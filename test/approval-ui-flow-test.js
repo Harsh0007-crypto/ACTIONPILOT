@@ -161,6 +161,9 @@ async function runTests() {
   const server = require("../server.js");
   const BASE_URL = "http://127.0.0.1:3457";
 
+  // Allow server startup
+  await new Promise(r => setTimeout(r, 600));
+
   async function api(path, options = {}) {
     const res = await fetch(`${BASE_URL}${path}`, {
       headers: { "Content-Type": "application/json" },
@@ -211,6 +214,7 @@ async function runTests() {
     console.log("\n==================================================");
     console.log("  ALL APPROVAL & EXECUTE FLOW TESTS PASSED! ✓   ");
     console.log("==================================================");
+    process.exit(0);
   });
 }
 
