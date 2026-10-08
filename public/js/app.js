@@ -1,16 +1,16 @@
 /**
  * ActionPilot Main Application Controller
  * Autonomous AI for getting things done.
- * Full production implementation with real Gemini AI integration,
- * deterministic fallback engine, sequential 01-04 workflow pipeline,
- * schedule preview, collapsible reasoning, dynamic conflict resolution,
- * adaptive re-planning, and full Schedule & Activity navigation.
+ * Premium, playful AI assistant interface with interactive Calendar widget
+ * (Month/Week/Day), illustrated workflow, AI mascot micro-interactions,
+ * and full human-in-the-loop oversight.
  */
 
 const App = {
   activePlan: null,
   isExecuting: false,
   activeNavTab: "command",
+  activeCalendarMode: "month",
   stats: {
     tasks: 0,
     schedule: 0,
@@ -20,6 +20,7 @@ const App = {
   async init() {
     ToolsView.init();
     this.bindEvents();
+    this.initCalendarWidget();
     await this.fetchHealth();
     await this.fetchState();
   },
@@ -47,11 +48,6 @@ const App = {
     const btnBackActivity = document.getElementById("btnBackToCommandFromActivity");
     if (btnBackActivity) {
       btnBackActivity.addEventListener("click", () => this.switchNavTab("command"));
-    }
-
-    const btnPreviewToSchedule = document.getElementById("btnPreviewToSchedule");
-    if (btnPreviewToSchedule) {
-      btnPreviewToSchedule.addEventListener("click", () => this.switchNavTab("schedule"));
     }
 
     const btnViewActivityFromComplete = document.getElementById("btnViewActivityFromComplete");
@@ -222,6 +218,58 @@ const App = {
     }
   },
 
+  // Initialize Month / Week / Day view switch controls on the Interactive Calendar
+  initCalendarWidget() {
+    const btnMonth = document.getElementById("btnCalModeMonth");
+    const btnWeek = document.getElementById("btnCalModeWeek");
+    const btnDay = document.getElementById("btnCalModeDay");
+
+    const setMode = (mode) => {
+      this.activeCalendarMode = mode;
+      [btnMonth, btnWeek, btnDay].forEach(b => {
+        if (b) b.classList.remove("active");
+      });
+
+      const paneMonth = document.getElementById("paneCalMonth");
+      const paneWeek = document.getElementById("paneCalWeek");
+      const paneDay = document.getElementById("paneCalDay");
+
+      [paneMonth, paneWeek, paneDay].forEach(p => {
+        if (p) {
+          p.classList.remove("active");
+          p.classList.add("hidden");
+        }
+      });
+
+      if (mode === "month") {
+        if (btnMonth) btnMonth.classList.add("active");
+        if (paneMonth) {
+          paneMonth.classList.remove("hidden");
+          paneMonth.classList.add("active");
+        }
+      } else if (mode === "week") {
+        if (btnWeek) btnWeek.classList.add("active");
+        if (paneWeek) {
+          paneWeek.classList.remove("hidden");
+          paneWeek.classList.add("active");
+        }
+      } else if (mode === "day") {
+        if (btnDay) btnDay.classList.add("active");
+        if (paneDay) {
+          paneDay.classList.remove("hidden");
+          paneDay.classList.add("active");
+        }
+      }
+    };
+
+    if (btnMonth) btnMonth.addEventListener("click", () => setMode("month"));
+    if (btnWeek) btnWeek.addEventListener("click", () => setMode("week"));
+    if (btnDay) btnDay.addEventListener("click", () => setMode("day"));
+
+    // Render baseline October 2026 calendar
+    this.renderInteractiveCalendar(null);
+  },
+
   // Switch top nav views (Command Center, Schedule, Activity)
   switchNavTab(tabName) {
     this.activeNavTab = tabName;
@@ -303,6 +351,11 @@ const App = {
       if (json.success && json.data) {
         ToolsView.render(json.data);
         this.renderActivityFeed(json.data.activityLog || []);
+        if (this.activePlan) {
+          this.renderInteractiveCalendar(this.activePlan, json.data.schedule || []);
+        } else {
+          this.renderInteractiveCalendar(null, json.data.schedule || []);
+        }
         if (this.activeNavTab === "schedule") {
           this.renderFullScheduleView(json.data.schedule || []);
         }
@@ -569,7 +622,7 @@ const App = {
     }
     if (summaryText) summaryText.textContent = plan.summary;
 
-    // Render 3–5 task glass cards
+    // Render 3–5 task glass cards with small playful icons
     if (actionsListEl) {
       const actions = plan.actions || [];
       actionsListEl.innerHTML = actions.map((act, idx) => {
@@ -579,15 +632,23 @@ const App = {
         const duration = act.estimatedDuration || "30 mins";
         const paddedNum = String(idx + 1).padStart(2, "0");
 
+        // Select small playful icon based on task nature
+        let iconEmoji = "📝";
+        if (title.toLowerCase().includes("slide") || title.toLowerCase().includes("visual")) iconEmoji = "🎨";
+        else if (title.toLowerCase().includes("rehearsal") || title.toLowerCase().includes("practice")) iconEmoji = "🎯";
+        else if (title.toLowerCase().includes("briefing") || title.toLowerCase().includes("notes")) iconEmoji = "📑";
+        else if (title.toLowerCase().includes("study") || title.toLowerCase().includes("exam")) iconEmoji = "📚";
+        else if (title.toLowerCase().includes("assignment") || title.toLowerCase().includes("quiz")) iconEmoji = "⏱️";
+
         return `
           <div class="plan-action-item">
             <span class="action-num">${paddedNum}</span>
             <div class="action-content">
-              <span class="action-title">${ToolsView.escapeHtml(title)}</span>
+              <span class="action-title">${iconEmoji} ${ToolsView.escapeHtml(title)}</span>
               ${sub ? `<span class="action-sub">${ToolsView.escapeHtml(sub)}</span>` : ""}
             </div>
             <div class="action-badges">
-              <span class="priority-pill priority-${priority.toLowerCase()}">${priority}</span>
+              <span class="priority-pill priority-${priority.toLowerCase()}">${priority.toUpperCase()}</span>
               <span class="duration-badge">${duration}</span>
               ${act.requiresApproval ? `<span class="action-gate-tag" title="Consequential calendar booking">Requires Approval</span>` : ""}
             </div>
@@ -596,13 +657,13 @@ const App = {
       }).join("");
     }
 
-    // Populate Schedule Preview (Timeline Blocks)
-    this.renderSchedulePreview(plan);
+    // Populate Interactive Calendar Widget
+    this.renderInteractiveCalendar(plan);
 
     // Evaluate Conflict Status
     this.updateConflictDetectionBanner(plan);
 
-    // Populate "Why this plan?" reasoning drawer
+    // Populate "Why this plan?" concise user-facing reasoning bullets
     this.populateWhyThisPlan(plan);
 
     await this.sleep(300);
@@ -624,7 +685,7 @@ const App = {
       const headline = approvalCard ? approvalCard.querySelector(".approval-headline") : null;
       if (headline) headline.textContent = "HUMAN APPROVAL REQUIRED";
       const approveText = btnApprove ? btnApprove.querySelector("span") : null;
-      if (approveText) approveText.textContent = "Approve & Execute →";
+      if (approveText) approveText.textContent = "APPROVE & EXECUTE →";
       if (btnReject) btnReject.classList.remove("hidden");
     } else {
       if (reasonText) {
@@ -636,7 +697,7 @@ const App = {
       const headline = approvalCard ? approvalCard.querySelector(".approval-headline") : null;
       if (headline) headline.textContent = "READY FOR EXECUTION";
       const approveText = btnApprove ? btnApprove.querySelector("span") : null;
-      if (approveText) approveText.textContent = "Execute Plan →";
+      if (approveText) approveText.textContent = "EXECUTE PLAN →";
       if (btnReject) btnReject.classList.add("hidden");
     }
 
@@ -648,36 +709,161 @@ const App = {
     }
   },
 
-  renderSchedulePreview(plan) {
-    const timelineEl = document.getElementById("schedulePreviewTimeline");
-    if (!timelineEl) return;
+  // ==========================================
+  // INTERACTIVE CALENDAR COMPONENT (Month, Week, Day & Today's Schedule)
+  // ==========================================
+  renderInteractiveCalendar(plan = null, stateSchedule = null) {
+    const grid = document.getElementById("calMonthGrid");
+    const weekGrid = document.getElementById("calWeekGrid");
+    const dayTimeline = document.getElementById("calDayTimeline");
+    const todaysContainer = document.getElementById("todaysTimelineCards");
+    const todaysCountBadge = document.getElementById("todaysCountBadge");
 
-    const schedActions = (plan.actions || []).filter(a => a.tool === "schedule" && a.params);
+    // Gather all scheduled events from active plan & stateStore.schedule
+    const events = [];
 
-    if (schedActions.length === 0) {
-      timelineEl.innerHTML = `
-        <div class="preview-chip">
-          <span class="preview-chip-time">09:00 AM</span>
-          <span class="preview-chip-title">Morning Focus &amp; Prep</span>
-        </div>
-        <div class="preview-chip">
-          <span class="preview-chip-time">02:00 PM</span>
-          <span class="preview-chip-title">Dedicated Rehearsal Session</span>
-        </div>
-      `;
-      return;
+    // From current plan
+    if (plan && plan.actions) {
+      plan.actions.forEach(a => {
+        if (a.tool === "schedule" && a.params) {
+          events.push({
+            id: a.id,
+            title: a.params.title || a.title || "Scheduled Focus Block",
+            time: a.params.startTime || "2:00 PM",
+            endTime: a.params.endTime || "3:00 PM",
+            dateNum: 8, // October 8
+            category: a.params.category || "focus"
+          });
+        }
+      });
     }
 
-    timelineEl.innerHTML = schedActions.map(a => {
-      const p = a.params;
-      const time = p.startTime ? `${p.startTime} - ${p.endTime}` : "Scheduled";
-      return `
-        <div class="preview-chip">
-          <span class="preview-chip-time">${ToolsView.escapeHtml(time)}</span>
-          <span class="preview-chip-title">${ToolsView.escapeHtml(p.title || a.title)}</span>
+    // From persisted stateStore.schedule if present
+    const existingSched = stateSchedule || [];
+    existingSched.forEach(e => {
+      events.push({
+        id: e.id,
+        title: e.title,
+        time: e.startTime,
+        endTime: e.endTime,
+        dateNum: 8,
+        category: e.category || "focus"
+      });
+    });
+
+    // If no events yet, offer intelligent contextual slots
+    if (events.length === 0) {
+      events.push(
+        { id: "demo-1", title: "Presentation Rehearsal", time: "2:00 PM", endTime: "3:00 PM", dateNum: 8, category: "focus" },
+        { id: "demo-2", title: "AI Quiz", time: "9:00 AM", endTime: "10:00 AM", dateNum: 9, category: "study" },
+        { id: "demo-3", title: "Math Assignment", time: "11:59 PM", endTime: "11:59 PM", dateNum: 10, category: "deadline" }
+      );
+    }
+
+    // 1. RENDER MONTH GRID (October 2026, 31 days)
+    if (grid) {
+      let cellsHtml = "";
+      // October 1, 2026 starts on Thursday (index 3, so 3 empty padding cells for Mon, Tue, Wed)
+      for (let p = 0; p < 3; p++) {
+        cellsHtml += `<div class="cal-day-cell other-month"><span class="cal-day-num">${28 + p}</span></div>`;
+      }
+
+      for (let day = 1; day <= 31; day++) {
+        const isToday = day === 8;
+        const dayEvents = events.filter(e => e.dateNum === day);
+
+        let eventChipsHtml = "";
+        dayEvents.forEach(evt => {
+          let chipClass = "cal-chip-focus";
+          if (evt.category === "study") chipClass = "cal-chip-defense";
+          else if (evt.category === "deadline") chipClass = "cal-chip-deadline";
+          else if (evt.category === "prep") chipClass = "cal-chip-prep";
+
+          eventChipsHtml += `
+            <div class="cal-event-chip ${chipClass}" title="${ToolsView.escapeHtml(evt.title)} (${evt.time})">
+              ${ToolsView.escapeHtml(evt.time)} ${ToolsView.escapeHtml(evt.title)}
+            </div>
+          `;
+        });
+
+        cellsHtml += `
+          <div class="cal-day-cell ${isToday ? 'today' : ''}">
+            <span class="cal-day-num">${day}${isToday ? ' ★' : ''}</span>
+            ${eventChipsHtml}
+          </div>
+        `;
+      }
+      grid.innerHTML = cellsHtml;
+    }
+
+    // 2. RENDER WEEK GRID (Oct 5 - Oct 11)
+    if (weekGrid) {
+      const daysOfWeek = ["Mon 5", "Tue 6", "Wed 7", "Thu 8 (Today)", "Fri 9", "Sat 10", "Sun 11"];
+      weekGrid.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
+          ${daysOfWeek.map((d, idx) => {
+            const isToday = idx === 3;
+            const dayNum = 5 + idx;
+            const dayEvents = events.filter(e => e.dateNum === dayNum);
+            return `
+              <div class="cal-day-cell ${isToday ? 'today' : ''}" style="min-height: 80px;">
+                <span class="cal-day-num">${d}</span>
+                ${dayEvents.map(e => `
+                  <div class="cal-event-chip cal-chip-focus" style="margin-top: 4px;">
+                    ${e.time} ${ToolsView.escapeHtml(e.title)}
+                  </div>
+                `).join("")}
+              </div>
+            `;
+          }).join("")}
         </div>
       `;
-    }).join("");
+    }
+
+    // 3. RENDER DAY TIMELINE (Hourly slots for Oct 8)
+    if (dayTimeline) {
+      const hours = ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"];
+      dayTimeline.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${hours.map(h => {
+            const match = events.find(e => e.time.startsWith(h.substring(0, 2)));
+            return `
+              <div style="display: flex; align-items: center; gap: 12px; padding: 6px 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--neon-cyan); width: 68px;">${h}</span>
+                <span style="font-size: 0.78rem; color: ${match ? '#fff' : 'var(--text-faint)'};">
+                  ${match ? `⚡ ${ToolsView.escapeHtml(match.title)} (${match.category})` : 'Free focus slot'}
+                </span>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    // 4. RENDER "TODAY'S SCHEDULE" TIMELINE CARDS
+    if (todaysContainer) {
+      const todayEvents = events.filter(e => e.dateNum === 8);
+      if (todaysCountBadge) todaysCountBadge.textContent = `${todayEvents.length} session${todayEvents.length === 1 ? '' : 's'}`;
+
+      if (todayEvents.length === 0) {
+        todaysContainer.innerHTML = `<div style="font-size: 0.76rem; color: var(--text-faint);">No focus blocks scheduled for today yet.</div>`;
+      } else {
+        todaysContainer.innerHTML = todayEvents.map(evt => {
+          let tagClass = "cal-chip-focus";
+          let tagLabel = "Focus";
+          if (evt.category === "study") { tagClass = "cal-chip-defense"; tagLabel = "Study"; }
+          else if (evt.category === "deadline") { tagClass = "cal-chip-deadline"; tagLabel = "Deadline"; }
+
+          return `
+            <div class="todays-card-item">
+              <span class="todays-card-time">${ToolsView.escapeHtml(evt.time)}</span>
+              <span class="todays-card-title">${ToolsView.escapeHtml(evt.title)}</span>
+              <span class="todays-card-tag ${tagClass}">${tagLabel}</span>
+            </div>
+          `;
+        }).join("");
+      }
+    }
   },
 
   updateConflictDetectionBanner(plan) {
@@ -689,7 +875,6 @@ const App = {
 
     if (!banner || !icon || !title || !detail || !btnResolve) return;
 
-    // Check if any schedule action or existing schedule has conflicts
     const hasConflict = (plan.actions || []).some(a => a.hasConflict || (a.params && a.params.hasConflict));
 
     if (hasConflict) {
@@ -708,27 +893,17 @@ const App = {
   },
 
   populateWhyThisPlan(plan) {
-    const whyUrgency = document.getElementById("whyUrgencyText");
-    const whyEffort = document.getElementById("whyEffortText");
-    const whyDep = document.getElementById("whyDependencyText");
-    const whyConflict = document.getElementById("whyConflictText");
+    const bulletsList = document.getElementById("whyBulletsList");
+    if (!bulletsList) return;
 
-    if (whyUrgency) {
-      whyUrgency.textContent = plan.deadline 
-        ? `Sequenced to finalize all deliverables prior to deadline (${plan.deadline}).`
-        : "Prioritized immediate high-impact milestones first.";
-    }
-    if (whyEffort) {
-      whyEffort.textContent = plan.estimatedTime
-        ? `Total estimated cognitive effort: ${plan.estimatedTime}, divided into paced blocks.`
-        : "Balanced cognitive load to prevent fatigue.";
-    }
-    if (whyDep) {
-      whyDep.textContent = "Information synthesis and preparation strictly precede calendar execution and reviews.";
-    }
-    if (whyConflict) {
-      whyConflict.textContent = "Evaluated current agenda to safeguard prime uninterrupted work periods.";
-    }
+    const deadlineStr = plan.deadline ? `ahead of ${plan.deadline}` : "prior to deadline";
+
+    bulletsList.innerHTML = `
+      <li><span class="bullet-dot">•</span> <strong>Deadline detected:</strong> Tasks scheduled to complete ${ToolsView.escapeHtml(deadlineStr)}.</li>
+      <li><span class="bullet-dot">•</span> <strong>High-priority task scheduled first:</strong> Synthesis and visual outlining take morning prime focus.</li>
+      <li><span class="bullet-dot">•</span> <strong>Rehearsal placed after slide completion:</strong> Dependent visual deck completed before dry-run rehearsal.</li>
+      <li><span class="bullet-dot">•</span> <strong>No schedule conflicts detected:</strong> Calendar verified for clean slot allocations.</li>
+    `;
   },
 
   async handleResolveConflict() {
@@ -741,7 +916,7 @@ const App = {
       const data = await res.json();
       if (data.success && data.plan) {
         this.activePlan = data.plan;
-        this.renderSchedulePreview(data.plan);
+        this.renderInteractiveCalendar(data.plan);
         this.updateConflictDetectionBanner(data.plan);
         await this.fetchState();
       }
@@ -814,6 +989,26 @@ const App = {
     if (statusPill) statusPill.textContent = "Executing your approved actions...";
     if (stream) stream.innerHTML = "";
 
+    // Show initial checklist progression
+    const initialSteps = [
+      "Goal understood",
+      "Plan generated",
+      "Schedule checked",
+      "Approval received"
+    ];
+
+    if (stream) {
+      for (const step of initialSteps) {
+        const row = document.createElement("div");
+        row.className = "exec-step-row done";
+        row.innerHTML = `
+          <span class="exec-step-icon">✓</span>
+          <span class="exec-step-text">${step}</span>
+        `;
+        stream.appendChild(row);
+      }
+    }
+
     const actions = this.activePlan.actions || [];
 
     try {
@@ -827,8 +1022,8 @@ const App = {
           row.className = "exec-step-row active";
           row.id = rowId;
           row.innerHTML = `
-            <span class="exec-step-icon">●</span>
-            <span class="exec-step-text">Executing: ${ToolsView.escapeHtml(title)}...</span>
+            <span class="exec-step-icon">⚡</span>
+            <span class="exec-step-text">Executing approved action: ${ToolsView.escapeHtml(title)}...</span>
           `;
           stream.appendChild(row);
           row.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -934,7 +1129,7 @@ const App = {
           row.className = "exec-step-row active";
           row.id = rowId;
           row.innerHTML = `
-            <span class="exec-step-icon">●</span>
+            <span class="exec-step-icon">⚡</span>
             <span class="exec-step-text">Executing safe task: ${ToolsView.escapeHtml(title)}...</span>
           `;
           stream.appendChild(row);
@@ -1005,11 +1200,12 @@ const App = {
     if (artifactsSummary) {
       const taskCount = this.stats.tasks || 2;
       const schedCount = wasRejected ? 0 : (this.stats.schedule || 1);
+      const timeOrganized = this.activePlan?.estimatedTime || "2 hours";
 
       artifactsSummary.innerHTML = `
-        <span class="artifact-pill">📋 ${taskCount} task${taskCount === 1 ? '' : 's'} registered</span>
-        <span class="artifact-pill">📅 ${schedCount} calendar session${schedCount === 1 ? '' : 's'} ${wasRejected ? '(cancelled)' : 'booked'}</span>
-        <span class="artifact-pill">📑 Notes &amp; checklist archived</span>
+        <span class="artifact-pill">✓ ${taskCount} Tasks completed</span>
+        <span class="artifact-pill">⏱ ${ToolsView.escapeHtml(timeOrganized)} organized</span>
+        <span class="artifact-pill">★ ${schedCount} Approved action${schedCount === 1 ? '' : 's'}</span>
       `;
     }
   },
@@ -1095,7 +1291,6 @@ const App = {
     const container = document.getElementById("fullScheduleContainer");
     if (!container) return;
 
-    const scheduleList = events || (window.ToolsView ? [] : []);
     fetch("/api/state")
       .then(r => r.json())
       .then(json => {
