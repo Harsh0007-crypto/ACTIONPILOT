@@ -114,13 +114,17 @@ async function runTest() {
     const tomorrowWindowEnd = 16 * 60;   // 960
     const demoDeadline = 17 * 60;        // 1020
 
+    const { getRelativeDayInfo } = require("../lib/dateTimeUtils");
+    const todayInfo = getRelativeDayInfo(0);
+    const tomorrowInfo = getRelativeDayInfo(1);
+
     schedule.forEach(s => {
       const sMin = timeToMin(s.startTime);
       const eMin = timeToMin(s.endTime);
-      const isToday = s.dateNum === 8 || (s.date && s.date.toLowerCase().includes("today"));
-      const isTomorrow = s.dateNum === 9 || (s.date && s.date.toLowerCase().includes("tomorrow"));
+      const isToday = s.dateNum === todayInfo.dateNum || (s.date && (s.date.toLowerCase().includes("today") || s.date.includes(todayInfo.monthShort + " " + todayInfo.dateNum)));
+      const isTomorrow = s.dateNum === tomorrowInfo.dateNum || (s.date && (s.date.toLowerCase().includes("tomorrow") || s.date.includes(tomorrowInfo.monthShort + " " + tomorrowInfo.dateNum)));
 
-      console.log(`  Checking session: [${s.task}] on [${s.date}] ${s.startTime} - ${s.endTime} (${sMin}m - ${eMin}m)`);
+      console.log(`  Checking session: [${s.task}] on [${s.date}] (dateNum: ${s.dateNum}) ${s.startTime} - ${s.endTime} (${sMin}m - ${eMin}m)`);
 
       if (isToday) {
         assert.ok(sMin >= todayWindowStart, `Today's session [${s.task}] started at ${s.startTime} (${sMin}m), which is before 7:00 PM`);

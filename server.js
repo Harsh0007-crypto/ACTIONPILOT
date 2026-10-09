@@ -15,6 +15,7 @@ const { executeTool } = require("./lib/toolRegistry");
 const { planWithGemini } = require("./lib/gemini");
 const { generateFallbackPlan } = require("./lib/fallbackPlanner");
 const { validateAndSynchronizePlan } = require("./lib/scheduleOptimizer");
+const { DEFAULT_TIMEZONE, getRelativeDayInfo } = require("./lib/dateTimeUtils");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,12 +30,17 @@ app.use(express.static(path.join(__dirname, "public")));
 // 1. HEALTH & SYSTEM STATUS
 // ==========================================
 app.get("/api/health", (req, res) => {
+  const timeZone = req.query.timeZone || req.headers["x-timezone"] || DEFAULT_TIMEZONE;
+  const today = getRelativeDayInfo(0, new Date(), timeZone);
   res.json({
     status: "ok",
     service: "ActionPilot Autonomous Kernel",
     version: "1.0.0",
     uptime: Math.floor(process.uptime()),
     geminiConfigured: !!process.env.GEMINI_API_KEY,
+    timeZone,
+    currentDate: today.isoDate,
+    currentDayLabel: today.dayLabel,
     timestamp: new Date().toISOString()
   });
 });
@@ -43,9 +49,15 @@ app.get("/api/health", (req, res) => {
 // 2. STATE MANAGEMENT
 // ==========================================
 app.get("/api/state", (req, res) => {
+  const timeZone = req.query.timeZone || req.headers["x-timezone"] || DEFAULT_TIMEZONE;
+  const today = getRelativeDayInfo(0, new Date(), timeZone);
   res.json({
     success: true,
-    data: stateStore.getState()
+    data: {
+      ...stateStore.getState(),
+      timeZone,
+      currentDate: today
+    }
   });
 });
 
@@ -75,7 +87,8 @@ app.post("/api/tasks/:id/status", (req, res) => {
 // 3. AGENT PLANNING PIPELINE
 // ==========================================
 app.post("/api/agent/plan", async (req, res) => {
-  const { goal, customApiKey } = req.body;
+  const { goal, customApiKey, timeZone } = req.body;
+  const userTz = timeZone || req.headers["x-timezone"] || DEFAULT_TIMEZONE;
 
   if (!goal || typeof goal !== "string" || goal.trim().length === 0) {
     return res.status(400).json({
@@ -95,7 +108,7 @@ app.post("/api/agent/plan", async (req, res) => {
   const hasKey = !!(customApiKey || process.env.GEMINI_API_KEY);
   if (hasKey) {
     try {
-      const geminiResp = await planWithGemini(cleanGoal, stateStore.getState(), customApiKey);
+      const geminiResp = await planWithGemini(cleanGoal, stateStore.getState(), customApiKey, userTz);
       if (geminiResp.success && geminiResp.data) {
         planResult = geminiResp.data;
         source = geminiResp.source;
@@ -110,12 +123,12 @@ app.post("/api/agent/plan", async (req, res) => {
 
   // Fallback to intelligent deterministic planner
   if (!planResult) {
-    planResult = generateFallbackPlan(cleanGoal, stateStore.getState());
+    planResult = generateFallbackPlan(cleanGoal, stateStore.getState(), userTz);
     source = planResult.source || "Autonomous Engine (Deterministic Fallback)";
   }
 
   // Ensure single source of truth and canonical synchronization
-  planResult = validateAndSynchronizePlan(planResult, cleanGoal);
+  planResult = validateAndSynchronizePlan(planResult, cleanGoal, userTz);
 
   // Ensure actions have consistent initial status
   const actions = (planResult.actions || []).map((action, index) => ({
@@ -350,7 +363,8 @@ app.post("/api/agent/resolve-conflict", (req, res) => {
 // 7. ADAPTIVE RE-PLANNING
 // ==========================================
 app.post("/api/agent/replan", async (req, res) => {
-  const { reason, customApiKey } = req.body;
+  const { reason, customApiKey, timeZone } = req.body;
+  const userTz = timeZone || req.headers["x-timezone"] || DEFAULT_TIMEZONE;
   if (!stateStore.currentPlan) {
     return res.status(400).json({ success: false, message: "No active plan to re-plan." });
   }
@@ -369,7 +383,7 @@ app.post("/api/agent/replan", async (req, res) => {
   if (hasKey) {
     try {
       const prompt = `Current goal: "${stateStore.currentPlan.goal}". Something changed: "${cleanReason}". Please adapt and return a refreshed plan.`;
-      const geminiResp = await planWithGemini(prompt, stateStore.getState(), customApiKey);
+      const geminiResp = await planWithGemini(prompt, stateStore.getState(), customApiKey, userTz);
       if (geminiResp.success && geminiResp.data) {
         updatedPlan = geminiResp.data;
         updatedPlan.source = geminiResp.source;

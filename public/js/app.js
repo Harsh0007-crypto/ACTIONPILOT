@@ -218,6 +218,122 @@ const App = {
     }
   },
 
+  // Dynamic user timezone & runtime date helpers (Asia/Kolkata default)
+  getUserTimeZone() {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
+    } catch (e) {
+      return "Asia/Kolkata";
+    }
+  },
+
+  getZonedDateParts(date = new Date()) {
+    const tz = this.getUserTimeZone();
+    const d = (typeof date === "string" || typeof date === "number") ? new Date(date) : (date || new Date());
+    const dtf = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      weekday: "short",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hour12: false
+    });
+    const partMap = {};
+    dtf.formatToParts(d).forEach(p => { partMap[p.type] = p.value; });
+    const year = parseInt(partMap.year, 10);
+    const month = parseInt(partMap.month, 10);
+    const day = parseInt(partMap.day, 10);
+    const weekday = partMap.weekday;
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthShorts = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return {
+      year,
+      month,
+      day,
+      weekday,
+      monthName: monthNames[month - 1] || "October",
+      monthShort: monthShorts[month - 1] || "Oct",
+      isoDate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+    };
+  },
+
+  getRelativeDayInfo(offsetDays = 0) {
+    const todayParts = this.getZonedDateParts(new Date());
+    const targetUtc = new Date(Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day + offsetDays, 12, 0, 0));
+    const targetParts = this.getZonedDateParts(targetUtc);
+    let dayPrefix = "";
+    if (offsetDays === 0) dayPrefix = "Today";
+    else if (offsetDays === 1) dayPrefix = "Tomorrow";
+    else dayPrefix = `Day ${offsetDays + 1}`;
+
+    return {
+      ...targetParts,
+      offsetDays,
+      dateNum: targetParts.day,
+      dayLabel: `${dayPrefix} (${targetParts.monthShort} ${targetParts.day})`,
+      dateLabel: `${targetParts.monthShort} ${targetParts.day}, ${targetParts.year}`
+    };
+  },
+
+  getWeekDays() {
+    const todayParts = this.getZonedDateParts(new Date());
+    const weekdayMap = { 'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6 };
+    const currentWeekDayIndex = weekdayMap[todayParts.weekday] !== undefined ? weekdayMap[todayParts.weekday] : 0;
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const offsetFromToday = i - currentWeekDayIndex;
+      const dayInfo = this.getRelativeDayInfo(offsetFromToday);
+      const isToday = offsetFromToday === 0;
+      days.push({
+        ...dayInfo,
+        weekIndex: i,
+        isToday,
+        headerLabel: `${dayInfo.weekday} ${dayInfo.day}${isToday ? " (Today)" : ""}`
+      });
+    }
+    return days;
+  },
+
+  getMonthCalendarGrid() {
+    const todayParts = this.getZonedDateParts(new Date());
+    const year = todayParts.year;
+    const month = todayParts.month;
+    const daysInCurrentMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const daysInPrevMonth = new Date(Date.UTC(year, month - 1, 0)).getUTCDate();
+    const firstDayParts = this.getZonedDateParts(new Date(Date.UTC(year, month - 1, 1, 12, 0, 0)));
+    const weekdayMap = { 'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6 };
+    const firstDayWeekIndex = weekdayMap[firstDayParts.weekday] !== undefined ? weekdayMap[firstDayParts.weekday] : 0;
+
+    const prevPadding = [];
+    for (let p = 0; p < firstDayWeekIndex; p++) {
+      prevPadding.push({
+        dayNum: daysInPrevMonth - firstDayWeekIndex + 1 + p,
+        isOtherMonth: true
+      });
+    }
+
+    const currentDays = [];
+    for (let d = 1; d <= daysInCurrentMonth; d++) {
+      currentDays.push({
+        dayNum: d,
+        isToday: d === todayParts.day,
+        dateStr: `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+      });
+    }
+
+    return {
+      monthTitle: `${todayParts.monthName} ${year}`,
+      year,
+      month,
+      todayDayNum: todayParts.day,
+      prevPadding,
+      days: currentDays
+    };
+  },
+
   // Initialize Month / Week / Day view switch controls on the Interactive Calendar
   initCalendarWidget() {
     const btnMonth = document.getElementById("btnCalModeMonth");
@@ -508,11 +624,19 @@ const App = {
 
     try {
       const customKey = sessionStorage.getItem("custom_gemini_key") || null;
+      const userTz = this.getUserTimeZone();
 
       const planResp = await fetch("/api/agent/plan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal, customApiKey: customKey })
+        headers: {
+          "Content-Type": "application/json",
+          "x-timezone": userTz
+        },
+        body: JSON.stringify({
+          goal,
+          customApiKey: customKey,
+          timeZone: userTz
+        })
       });
 
       const planData = await planResp.json();
@@ -719,6 +843,33 @@ const App = {
     const todaysContainer = document.getElementById("todaysTimelineCards");
     const todaysCountBadge = document.getElementById("todaysCountBadge");
 
+    const today = this.getRelativeDayInfo(0);
+    const tomorrow = this.getRelativeDayInfo(1);
+
+    const parseEventDateNum = (s) => {
+      if (s.dateNum !== undefined && s.dateNum !== null && !isNaN(s.dateNum)) return parseInt(s.dateNum, 10);
+      const rawDate = (s.date || "").toLowerCase();
+      if (rawDate.includes("today") || rawDate.includes("this evening")) return today.dateNum;
+      if (rawDate.includes("tomorrow")) return tomorrow.dateNum;
+      const isoMatch = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (isoMatch) return parseInt(isoMatch[3], 10);
+      const mMatch = rawDate.match(/(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})/i);
+      if (mMatch) return parseInt(mMatch[1], 10);
+      const dayMatch = rawDate.match(/day\s*(\d+)/i);
+      if (dayMatch) {
+        const off = parseInt(dayMatch[1], 10) - 1;
+        return this.getRelativeDayInfo(off).dateNum;
+      }
+      return today.dateNum;
+    };
+
+    // Update Calendar Header Title (e.g. October 2026)
+    const monthGridData = this.getMonthCalendarGrid();
+    const calMonthTitle = document.getElementById("calMonthTitle");
+    if (calMonthTitle) {
+      calMonthTitle.textContent = monthGridData.monthTitle;
+    }
+
     // Gather all scheduled events from active plan & stateStore.schedule
     const events = [];
     const seenEventKeys = new Set();
@@ -730,13 +881,14 @@ const App = {
         const key = `${s.task || s.title}-${s.startTime}`;
         if (!seenEventKeys.has(key)) {
           seenEventKeys.add(key);
+          const dNum = parseEventDateNum(s);
           events.push({
             id,
             title: s.task || s.title || "Focus Block",
             time: s.startTime || "7:00 PM",
             endTime: s.endTime || "8:30 PM",
-            dateNum: s.dateNum || (s.date && s.date.includes("9") ? 9 : (s.date && s.date.includes("10") ? 10 : 8)),
-            date: s.date || "Today (Oct 8)",
+            dateNum: dNum,
+            date: s.date || today.dayLabel,
             category: s.category || "focus"
           });
         }
@@ -748,14 +900,14 @@ const App = {
           const key = `${a.params.title || a.title}-${a.params.startTime}`;
           if (!seenEventKeys.has(key)) {
             seenEventKeys.add(key);
-            const rawDate = a.params.date || "Today (Oct 8)";
-            const dateNum = rawDate.includes("9") || rawDate.toLowerCase().includes("tomorrow") ? 9 : (rawDate.includes("10") ? 10 : 8);
+            const rawDate = a.params.date || today.dayLabel;
+            const dNum = parseEventDateNum({ dateNum: a.params.dateNum, date: rawDate });
             events.push({
               id: a.id,
               title: a.params.title || a.title || "Scheduled Focus Block",
               time: a.params.startTime || "7:00 PM",
               endTime: a.params.endTime || "8:30 PM",
-              dateNum,
+              dateNum: dNum,
               date: rawDate,
               category: a.params.category || "focus"
             });
@@ -770,14 +922,14 @@ const App = {
       const key = `${e.title}-${e.startTime}`;
       if (!seenEventKeys.has(key)) {
         seenEventKeys.add(key);
-        const rawDate = e.date || "Today (Oct 8)";
-        const dateNum = rawDate.includes("9") || rawDate.toLowerCase().includes("tomorrow") ? 9 : (rawDate.includes("10") ? 10 : 8);
+        const rawDate = e.date || today.dayLabel;
+        const dNum = parseEventDateNum(e);
         events.push({
           id: e.id,
           title: e.title,
           time: e.startTime,
           endTime: e.endTime,
-          dateNum,
+          dateNum: dNum,
           date: rawDate,
           category: e.category || "focus"
         });
@@ -787,23 +939,22 @@ const App = {
     // ONLY show placeholder demo events if NO plan and NO state schedule exists at all
     if (events.length === 0 && !plan) {
       events.push(
-        { id: "demo-1", title: "Presentation Rehearsal", time: "2:00 PM", endTime: "3:00 PM", dateNum: 8, category: "focus" },
-        { id: "demo-2", title: "Project Demo Walkthrough", time: "1:00 PM", endTime: "2:30 PM", dateNum: 9, category: "study" },
-        { id: "demo-3", title: "Final Deliverable", time: "05:00 PM", endTime: "05:00 PM", dateNum: 9, category: "deadline" }
+        { id: "demo-1", title: "Presentation Rehearsal", time: "2:00 PM", endTime: "3:00 PM", dateNum: today.dateNum, date: today.dayLabel, category: "focus" },
+        { id: "demo-2", title: "Project Demo Walkthrough", time: "1:00 PM", endTime: "2:30 PM", dateNum: tomorrow.dateNum, date: tomorrow.dayLabel, category: "study" },
+        { id: "demo-3", title: "Final Deliverable", time: "05:00 PM", endTime: "05:00 PM", dateNum: tomorrow.dateNum, date: tomorrow.dayLabel, category: "deadline" }
       );
     }
 
-    // 1. RENDER MONTH GRID (October 2026, 31 days)
+    // 1. RENDER MONTH GRID (Dynamic days in month & padding)
     if (grid) {
       let cellsHtml = "";
-      // October 1, 2026 starts on Thursday (index 3, so 3 empty padding cells for Mon, Tue, Wed)
-      for (let p = 0; p < 3; p++) {
-        cellsHtml += `<div class="cal-day-cell other-month"><span class="cal-day-num">${28 + p}</span></div>`;
-      }
+      monthGridData.prevPadding.forEach(p => {
+        cellsHtml += `<div class="cal-day-cell other-month"><span class="cal-day-num">${p.dayNum}</span></div>`;
+      });
 
-      for (let day = 1; day <= 31; day++) {
-        const isToday = day === 8;
-        const dayEvents = events.filter(e => e.dateNum === day);
+      monthGridData.days.forEach(dayObj => {
+        const isToday = dayObj.isToday;
+        const dayEvents = events.filter(e => e.dateNum === dayObj.dayNum);
 
         let eventChipsHtml = "";
         dayEvents.forEach(evt => {
@@ -821,26 +972,24 @@ const App = {
 
         cellsHtml += `
           <div class="cal-day-cell ${isToday ? 'today' : ''}">
-            <span class="cal-day-num">${day}${isToday ? ' ★' : ''}</span>
+            <span class="cal-day-num">${dayObj.dayNum}${isToday ? ' ★' : ''}</span>
             ${eventChipsHtml}
           </div>
         `;
-      }
+      });
       grid.innerHTML = cellsHtml;
     }
 
-    // 2. RENDER WEEK GRID (Oct 5 - Oct 11)
+    // 2. RENDER WEEK GRID (Dynamic 7 days of current week)
     if (weekGrid) {
-      const daysOfWeek = ["Mon 5", "Tue 6", "Wed 7", "Thu 8 (Today)", "Fri 9", "Sat 10", "Sun 11"];
+      const weekDays = this.getWeekDays();
       weekGrid.innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
-          ${daysOfWeek.map((d, idx) => {
-            const isToday = idx === 3;
-            const dayNum = 5 + idx;
-            const dayEvents = events.filter(e => e.dateNum === dayNum);
+          ${weekDays.map(wd => {
+            const dayEvents = events.filter(e => e.dateNum === wd.dateNum);
             return `
-              <div class="cal-day-cell ${isToday ? 'today' : ''}" style="min-height: 80px;">
-                <span class="cal-day-num">${d}</span>
+              <div class="cal-day-cell ${wd.isToday ? 'today' : ''}" style="min-height: 80px;">
+                <span class="cal-day-num">${wd.headerLabel}</span>
                 ${dayEvents.map(e => `
                   <div class="cal-event-chip cal-chip-focus" style="margin-top: 4px;">
                     ${e.time} ${ToolsView.escapeHtml(e.title)}
@@ -853,9 +1002,9 @@ const App = {
       `;
     }
 
-    // 3. RENDER DAY TIMELINE (Hourly slots for Oct 8)
+    // 3. RENDER DAY TIMELINE (Hourly slots for dynamic Today)
     if (dayTimeline) {
-      const todayEvts = events.filter(e => e.dateNum === 8 || (e.date && e.date.toLowerCase().includes("today")));
+      const todayEvts = events.filter(e => e.dateNum === today.dateNum || (e.date && e.date.toLowerCase().includes("today")));
       const activeHours = new Set();
       todayEvts.forEach(e => {
         if (e.time) activeHours.add(e.time);
@@ -884,7 +1033,7 @@ const App = {
 
     // 4. RENDER "TODAY'S SCHEDULE" TIMELINE CARDS
     if (todaysContainer) {
-      const todayEvents = events.filter(e => e.dateNum === 8 || (e.date && e.date.toLowerCase().includes("today")));
+      const todayEvents = events.filter(e => e.dateNum === today.dateNum || (e.date && e.date.toLowerCase().includes("today")));
       if (todaysCountBadge) todaysCountBadge.textContent = `${todayEvents.length} session${todayEvents.length === 1 ? '' : 's'}`;
 
       if (todayEvents.length === 0) {
@@ -980,10 +1129,18 @@ const App = {
 
     try {
       const customKey = sessionStorage.getItem("custom_gemini_key") || null;
+      const userTz = this.getUserTimeZone();
       const res = await fetch("/api/agent/replan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "Adaptive reschedule requested", customApiKey: customKey })
+        headers: {
+          "Content-Type": "application/json",
+          "x-timezone": userTz
+        },
+        body: JSON.stringify({
+          reason: "Adaptive reschedule requested",
+          customApiKey: customKey,
+          timeZone: userTz
+        })
       });
       const data = await res.json();
       if (data.success && data.plan) {
