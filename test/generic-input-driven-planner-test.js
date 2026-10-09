@@ -120,15 +120,19 @@ async function runGenericPlannerTest() {
       assert.strictEqual(s.dateNum, todayInfo.dateNum, "API schedule dateNum must match today");
     });
 
+    if (server.closeAllConnections) server.closeAllConnections();
     server.close(() => {
       console.log("\n==================================================");
       console.log("  ALL GENERIC INPUT-DRIVEN CHECKS PASSED! ✓       ");
       console.log("==================================================");
-      process.exit(0);
+      setTimeout(() => process.exit(0), 50);
     });
 
   } catch (err) {
-    if (server) server.close();
+    if (server) {
+      if (server.closeAllConnections) server.closeAllConnections();
+      server.close();
+    }
     throw err;
   }
 }

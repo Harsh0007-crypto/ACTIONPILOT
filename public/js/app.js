@@ -1157,13 +1157,17 @@ const App = {
 
     if (!banner || !icon || !title || !detail || !btnResolve) return;
 
-    const hasConflict = (plan.actions || []).some(a => a.hasConflict || (a.params && a.params.hasConflict));
+    const conflicts = Array.isArray(plan.conflicts) ? plan.conflicts : [];
+    const hasConflict = conflicts.length > 0 || (plan.actions || []).some(a => a.hasConflict || (a.params && a.params.hasConflict));
 
     if (hasConflict) {
       banner.className = "conflict-banner has-conflict";
       icon.textContent = "⚠";
       title.textContent = "Schedule conflict detected";
-      detail.textContent = "Proposed calendar block overlaps with existing commitments.";
+      const conflictMsg = conflicts.length > 0
+        ? conflicts.join("; ")
+        : "Proposed calendar block overlaps with existing commitments.";
+      detail.textContent = conflictMsg;
       btnResolve.classList.remove("hidden");
     } else {
       banner.className = "conflict-banner";
@@ -1183,11 +1187,17 @@ const App = {
       ? plan.constraints[0]
       : "All sessions scheduled strictly within your stated availability.";
 
+    const conflicts = Array.isArray(plan.conflicts) ? plan.conflicts : [];
+    const hasConflict = conflicts.length > 0;
+    const conflictBullet = hasConflict
+      ? `<li><span class="bullet-dot" style="color: #f87171;">⚠</span> <strong style="color: #f87171;">Conflict Detected:</strong> ${ToolsView.escapeHtml(conflicts[0])}</li>`
+      : `<li><span class="bullet-dot">•</span> <strong>No schedule conflicts:</strong> Calendar blocks verified for zero clashes.</li>`;
+
     bulletsList.innerHTML = `
       <li><span class="bullet-dot">•</span> <strong>Objective:</strong> ${ToolsView.escapeHtml(plan.summary || 'Optimized personal workflow generated.')}</li>
       <li><span class="bullet-dot">•</span> <strong>Availability preserved:</strong> ${ToolsView.escapeHtml(constraintText)}</li>
       <li><span class="bullet-dot">•</span> <strong>Milestone sequencing:</strong> Tasks prioritized to complete ${ToolsView.escapeHtml(deadlineStr)}.</li>
-      <li><span class="bullet-dot">•</span> <strong>No schedule conflicts:</strong> Calendar blocks verified for zero clashes.</li>
+      ${conflictBullet}
     `;
   },
 

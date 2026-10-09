@@ -238,6 +238,7 @@ app.post("/api/agent/plan", async (req, res) => {
 
   const structuredPlan = {
     ...planResult,
+    goal: cleanGoal,
     source,
     actions,
     createdAt: new Date().toISOString()
