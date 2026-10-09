@@ -11,6 +11,7 @@ const App = {
   isExecuting: false,
   activeNavTab: "command",
   activeCalendarMode: "month",
+  selectedLanguage: (typeof localStorage !== "undefined" && localStorage.getItem) ? (localStorage.getItem("actionpilot_lang") || "en") : "en",
   stats: {
     tasks: 0,
     schedule: 0,
@@ -19,10 +20,26 @@ const App = {
 
   async init() {
     ToolsView.init();
+    this.initLanguageSelector();
     this.bindEvents();
     this.initCalendarWidget();
     await this.fetchHealth();
     await this.fetchState();
+  },
+
+  initLanguageSelector() {
+    const langSelect = document.getElementById("langSelect");
+    if (langSelect) {
+      langSelect.value = this.selectedLanguage;
+      langSelect.addEventListener("change", (e) => {
+        this.selectedLanguage = e.target.value;
+        localStorage.setItem("actionpilot_lang", this.selectedLanguage);
+        // Language switch preserves active plan seamlessly
+        if (this.activePlan) {
+          this.renderPlanWorkflowProgressive(this.activePlan);
+        }
+      });
+    }
   },
 
   bindEvents() {
@@ -141,10 +158,19 @@ const App = {
       btnResolveConflict.addEventListener("click", () => this.handleResolveConflict());
     }
 
-    // 11. Adaptive Re-planning Button
+    // 11. Adaptive Re-planning Button & Enter Key
     const btnReplanWithAI = document.getElementById("btnReplanWithAI");
     if (btnReplanWithAI) {
       btnReplanWithAI.addEventListener("click", () => this.handleAdaptiveReplan());
+    }
+    const replanInput = document.getElementById("replanInput");
+    if (replanInput) {
+      replanInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          this.handleAdaptiveReplan();
+        }
+      });
     }
 
     // 12. "View Created Items" Button (Toggles Secondary Details Drawer)
@@ -630,12 +656,14 @@ const App = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-timezone": userTz
+          "x-timezone": userTz,
+          "x-language": this.selectedLanguage
         },
         body: JSON.stringify({
           goal,
           customApiKey: customKey,
-          timeZone: userTz
+          timeZone: userTz,
+          language: this.selectedLanguage
         })
       });
 
@@ -746,35 +774,56 @@ const App = {
     }
     if (summaryText) summaryText.textContent = plan.summary;
 
-    // Render 3–5 task glass cards with small playful icons
+    // Render clean, readable task cards with clear time, duration & priority
     if (actionsListEl) {
       const actions = plan.actions || [];
+      const schedMap = new Map();
+      (plan.schedule || []).forEach(s => {
+        if (s.taskId) schedMap.set(s.taskId, s);
+        if (s.task) schedMap.set(s.task.toLowerCase(), s);
+      });
+
       actionsListEl.innerHTML = actions.map((act, idx) => {
         const title = act.title || act.description;
-        const sub = (act.title && act.description && act.title !== act.description) ? act.description : "";
         const priority = act.priority || "medium";
         const duration = act.estimatedDuration || "30 mins";
         const paddedNum = String(idx + 1).padStart(2, "0");
 
-        // Select small playful icon based on task nature
+        // Link with scheduled time if available
+        const matchingSched = (act.tool === "schedule" && act.params) 
+          ? act.params 
+          : schedMap.get(act.id) || schedMap.get(title.toLowerCase());
+        
+        const timeBadge = matchingSched && matchingSched.startTime 
+          ? `<span class="task-time-badge">${ToolsView.escapeHtml(matchingSched.startTime)}${matchingSched.endTime ? ` – ${ToolsView.escapeHtml(matchingSched.endTime)}` : ''}</span>`
+          : '';
+
+        // Select clean icon based on task nature
         let iconEmoji = "📝";
-        if (title.toLowerCase().includes("slide") || title.toLowerCase().includes("visual")) iconEmoji = "🎨";
-        else if (title.toLowerCase().includes("rehearsal") || title.toLowerCase().includes("practice")) iconEmoji = "🎯";
-        else if (title.toLowerCase().includes("briefing") || title.toLowerCase().includes("notes")) iconEmoji = "📑";
-        else if (title.toLowerCase().includes("study") || title.toLowerCase().includes("exam")) iconEmoji = "📚";
-        else if (title.toLowerCase().includes("assignment") || title.toLowerCase().includes("quiz")) iconEmoji = "⏱️";
+        const lowerTitle = title.toLowerCase();
+        if (lowerTitle.includes("slide") || lowerTitle.includes("visual")) iconEmoji = "🎨";
+        else if (lowerTitle.includes("rehearsal") || lowerTitle.includes("practice") || lowerTitle.includes("demo")) iconEmoji = "🎯";
+        else if (lowerTitle.includes("notes") || lowerTitle.includes("checklist")) iconEmoji = "📑";
+        else if (lowerTitle.includes("study") || lowerTitle.includes("exam") || lowerTitle.includes("math")) iconEmoji = "📚";
+        else if (lowerTitle.includes("schedule") || act.tool === "schedule") iconEmoji = "📅";
+        else if (lowerTitle.includes("sync") || lowerTitle.includes("meeting") || lowerTitle.includes("class")) iconEmoji = "👥";
+
+        // Clean display title: remove "Create task: " prefix if present
+        const displayTitle = title.replace(/^Create task:\s*/i, "").replace(/^Schedule\s+/i, "");
 
         return `
           <div class="plan-action-item">
             <span class="action-num">${paddedNum}</span>
             <div class="action-content">
-              <span class="action-title">${iconEmoji} ${ToolsView.escapeHtml(title)}</span>
-              ${sub ? `<span class="action-sub">${ToolsView.escapeHtml(sub)}</span>` : ""}
+              <div class="action-title-row">
+                <span class="action-title">${iconEmoji} ${ToolsView.escapeHtml(displayTitle)}</span>
+              </div>
             </div>
             <div class="action-badges">
-              <span class="priority-pill priority-${priority.toLowerCase()}">${priority.toUpperCase()}</span>
+              ${timeBadge}
               <span class="duration-badge">${duration}</span>
-              ${act.requiresApproval ? `<span class="action-gate-tag" title="Consequential calendar booking">Requires Approval</span>` : ""}
+              ${priority ? `<span class="priority-pill priority-${priority.toLowerCase()}">${priority.toUpperCase()}</span>` : ""}
+              ${act.requiresApproval ? `<span class="action-gate-tag" title="Sensitive action requiring your approval">Needs Approval</span>` : ""}
             </div>
           </div>
         `;
@@ -786,6 +835,18 @@ const App = {
 
     // Evaluate Conflict Status
     this.updateConflictDetectionBanner(plan);
+
+    // Evaluate Clarification Status (Priority 1)
+    const clarCard = document.getElementById("clarificationAlertCard");
+    const clarText = document.getElementById("valClarificationText");
+    if (clarCard && clarText) {
+      if (plan.clarification) {
+        clarText.textContent = plan.clarification;
+        clarCard.classList.remove("hidden");
+      } else {
+        clarCard.classList.add("hidden");
+      }
+    }
 
     // Populate "Why this plan?" concise user-facing reasoning bullets
     this.populateWhyThisPlan(plan);
@@ -870,6 +931,23 @@ const App = {
       calMonthTitle.textContent = monthGridData.monthTitle;
     }
 
+    // Helper to format clean, concise event titles for calendar chips & cards
+    const formatConciseTitle = (raw) => {
+      if (!raw) return "Focus Block";
+      let t = String(raw).trim();
+      // Remove leading "Schedule " if present
+      t = t.replace(/^Schedule\s+/i, "");
+      // Remove trailing time ranges like "(7:00 PM - 8:30 PM)"
+      t = t.replace(/\s*\(\d{1,2}:\d{2}\s*(?:AM|PM)?\s*-\s*\d{1,2}:\d{2}\s*(?:AM|PM)?\)/i, "");
+      // If it's a huge sentence, take first clause
+      t = t.split(/[.\n!?]/)[0].trim();
+      if (t.length > 36) {
+        const trunc = t.slice(0, 34).replace(/\s+\S*$/, "");
+        t = (trunc.length >= 10 ? trunc : t.slice(0, 34)).trim() + "…";
+      }
+      return t || "Focus Block";
+    };
+
     // Gather all scheduled events from active plan & stateStore.schedule
     const events = [];
     const seenEventKeys = new Set();
@@ -882,9 +960,11 @@ const App = {
         if (!seenEventKeys.has(key)) {
           seenEventKeys.add(key);
           const dNum = parseEventDateNum(s);
+          const rawTitle = s.task || s.title || "Focus Block";
           events.push({
             id,
-            title: s.task || s.title || "Focus Block",
+            title: formatConciseTitle(rawTitle),
+            rawTitle: rawTitle,
             time: s.startTime || "7:00 PM",
             endTime: s.endTime || "8:30 PM",
             dateNum: dNum,
@@ -902,9 +982,11 @@ const App = {
             seenEventKeys.add(key);
             const rawDate = a.params.date || today.dayLabel;
             const dNum = parseEventDateNum({ dateNum: a.params.dateNum, date: rawDate });
+            const rawTitle = a.params.title || a.title || "Scheduled Focus Block";
             events.push({
               id: a.id,
-              title: a.params.title || a.title || "Scheduled Focus Block",
+              title: formatConciseTitle(rawTitle),
+              rawTitle: rawTitle,
               time: a.params.startTime || "7:00 PM",
               endTime: a.params.endTime || "8:30 PM",
               dateNum: dNum,
@@ -924,9 +1006,11 @@ const App = {
         seenEventKeys.add(key);
         const rawDate = e.date || today.dayLabel;
         const dNum = parseEventDateNum(e);
+        const rawTitle = e.title || "Focus Block";
         events.push({
           id: e.id,
-          title: e.title,
+          title: formatConciseTitle(rawTitle),
+          rawTitle: rawTitle,
           time: e.startTime,
           endTime: e.endTime,
           dateNum: dNum,
@@ -939,9 +1023,9 @@ const App = {
     // ONLY show placeholder demo events if NO plan and NO state schedule exists at all
     if (events.length === 0 && !plan) {
       events.push(
-        { id: "demo-1", title: "Presentation Rehearsal", time: "2:00 PM", endTime: "3:00 PM", dateNum: today.dateNum, date: today.dayLabel, category: "focus" },
-        { id: "demo-2", title: "Project Demo Walkthrough", time: "1:00 PM", endTime: "2:30 PM", dateNum: tomorrow.dateNum, date: tomorrow.dayLabel, category: "study" },
-        { id: "demo-3", title: "Final Deliverable", time: "05:00 PM", endTime: "05:00 PM", dateNum: tomorrow.dateNum, date: tomorrow.dayLabel, category: "deadline" }
+        { id: "demo-1", title: "Presentation Rehearsal", rawTitle: "Presentation Rehearsal", time: "2:00 PM", endTime: "3:00 PM", dateNum: today.dateNum, date: today.dayLabel, category: "focus" },
+        { id: "demo-2", title: "Project Demo Walkthrough", rawTitle: "Project Demo Walkthrough", time: "1:00 PM", endTime: "2:30 PM", dateNum: tomorrow.dateNum, date: tomorrow.dayLabel, category: "study" },
+        { id: "demo-3", title: "Final Deliverable", rawTitle: "Final Deliverable", time: "05:00 PM", endTime: "05:00 PM", dateNum: tomorrow.dateNum, date: tomorrow.dayLabel, category: "deadline" }
       );
     }
 
@@ -963,9 +1047,11 @@ const App = {
           else if (evt.category === "deadline") chipClass = "cal-chip-deadline";
           else if (evt.category === "prep") chipClass = "cal-chip-prep";
 
+          const chipText = evt.title.length > 18 ? evt.title.slice(0, 16) + "…" : evt.title;
+
           eventChipsHtml += `
-            <div class="cal-event-chip ${chipClass}" title="${ToolsView.escapeHtml(evt.title)} (${evt.time})">
-              ${ToolsView.escapeHtml(evt.time)} ${ToolsView.escapeHtml(evt.title)}
+            <div class="cal-event-chip ${chipClass}" title="${ToolsView.escapeHtml(evt.rawTitle || evt.title)} (${evt.time})">
+              ${ToolsView.escapeHtml(evt.time)} ${ToolsView.escapeHtml(chipText)}
             </div>
           `;
         });
@@ -984,17 +1070,20 @@ const App = {
     if (weekGrid) {
       const weekDays = this.getWeekDays();
       weekGrid.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; width: 100%; box-sizing: border-box;">
           ${weekDays.map(wd => {
             const dayEvents = events.filter(e => e.dateNum === wd.dateNum);
             return `
               <div class="cal-day-cell ${wd.isToday ? 'today' : ''}" style="min-height: 80px;">
                 <span class="cal-day-num">${wd.headerLabel}</span>
-                ${dayEvents.map(e => `
-                  <div class="cal-event-chip cal-chip-focus" style="margin-top: 4px;">
-                    ${e.time} ${ToolsView.escapeHtml(e.title)}
-                  </div>
-                `).join("")}
+                ${dayEvents.map(e => {
+                  const chipText = e.title.length > 18 ? e.title.slice(0, 16) + "…" : e.title;
+                  return `
+                    <div class="cal-event-chip cal-chip-focus" style="margin-top: 4px;" title="${ToolsView.escapeHtml(e.rawTitle || e.title)} (${e.time})">
+                      ${e.time} ${ToolsView.escapeHtml(chipText)}
+                    </div>
+                  `;
+                }).join("")}
               </div>
             `;
           }).join("")}
@@ -1046,7 +1135,7 @@ const App = {
           else if (evt.category === "deadline") { tagClass = "cal-chip-deadline"; tagLabel = "Deadline"; }
 
           return `
-            <div class="todays-card-item">
+            <div class="todays-card-item" title="${ToolsView.escapeHtml(evt.rawTitle || evt.title)}">
               <span class="todays-card-time">${ToolsView.escapeHtml(evt.time)}</span>
               <span class="todays-card-title">${ToolsView.escapeHtml(evt.title)}</span>
               <span class="todays-card-tag ${tagClass}">${tagLabel}</span>
@@ -1122,9 +1211,12 @@ const App = {
   async handleAdaptiveReplan() {
     if (!this.activePlan) return;
     const btnReplan = document.getElementById("btnReplanWithAI");
+    const replanInput = document.getElementById("replanInput");
+    const editInstruction = (replanInput ? replanInput.value.trim() : "") || "Adaptive reschedule requested";
+
     if (btnReplan) {
       btnReplan.disabled = true;
-      btnReplan.innerHTML = `<span>Re-planning...</span>`;
+      btnReplan.innerHTML = `<span>Updating plan...</span>`;
     }
 
     try {
@@ -1134,17 +1226,21 @@ const App = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-timezone": userTz
+          "x-timezone": userTz,
+          "x-language": this.selectedLanguage
         },
         body: JSON.stringify({
-          reason: "Adaptive reschedule requested",
+          instruction: editInstruction,
+          reason: editInstruction,
           customApiKey: customKey,
-          timeZone: userTz
+          timeZone: userTz,
+          language: this.selectedLanguage
         })
       });
       const data = await res.json();
       if (data.success && data.plan) {
         this.activePlan = data.plan;
+        if (replanInput) replanInput.value = "";
         await this.renderPlanWorkflowProgressive(data.plan);
         await this.fetchState();
       }
@@ -1158,7 +1254,7 @@ const App = {
             <polyline points="23 4 23 10 17 10"></polyline>
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
           </svg>
-          <span>Re-plan with AI →</span>
+          <span>Re-plan &rarr;</span>
         `;
       }
     }

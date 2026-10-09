@@ -14,8 +14,9 @@ const stateStore = require("./lib/stateStore");
 const { executeTool } = require("./lib/toolRegistry");
 const { planWithGemini } = require("./lib/gemini");
 const { generateFallbackPlan } = require("./lib/fallbackPlanner");
-const { validateAndSynchronizePlan } = require("./lib/scheduleOptimizer");
+const { validateAndSynchronizePlan, applyScheduleEdit } = require("./lib/scheduleOptimizer");
 const { DEFAULT_TIMEZONE, getRelativeDayInfo } = require("./lib/dateTimeUtils");
+const { LANG_EN, normalizeLanguage } = require("./lib/i18n");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -87,8 +88,9 @@ app.post("/api/tasks/:id/status", (req, res) => {
 // 3. AGENT PLANNING PIPELINE
 // ==========================================
 app.post("/api/agent/plan", async (req, res) => {
-  const { goal, customApiKey, timeZone } = req.body;
+  const { goal, customApiKey, timeZone, language } = req.body;
   const userTz = timeZone || req.headers["x-timezone"] || DEFAULT_TIMEZONE;
+  const userLang = normalizeLanguage(language || req.headers["x-language"] || LANG_EN, goal);
 
   if (!goal || typeof goal !== "string" || goal.trim().length === 0) {
     return res.status(400).json({
@@ -99,7 +101,7 @@ app.post("/api/agent/plan", async (req, res) => {
   }
 
   const cleanGoal = goal.trim();
-  stateStore.logActivity("agent", `Analyzing Goal: "${cleanGoal.slice(0, 80)}${cleanGoal.length > 80 ? "..." : ""}"`, "Parsing intent, extracting constraints, and mapping dependencies", "compass");
+  stateStore.logActivity("agent", `Analyzing Goal: "${cleanGoal.slice(0, 80)}${cleanGoal.length > 80 ? "..." : ""}"`, `Parsing intent, language [${userLang}], extracting constraints, and mapping dependencies`, "compass");
 
   let planResult = null;
   let source = "Autonomous Engine (Deterministic Fallback)";
@@ -108,7 +110,7 @@ app.post("/api/agent/plan", async (req, res) => {
   const hasKey = !!(customApiKey || process.env.GEMINI_API_KEY);
   if (hasKey) {
     try {
-      const geminiResp = await planWithGemini(cleanGoal, stateStore.getState(), customApiKey, userTz);
+      const geminiResp = await planWithGemini(cleanGoal, stateStore.getState(), customApiKey, userTz, new Date(), userLang);
       if (geminiResp.success && geminiResp.data) {
         planResult = geminiResp.data;
         source = geminiResp.source;
@@ -123,12 +125,12 @@ app.post("/api/agent/plan", async (req, res) => {
 
   // Fallback to intelligent deterministic planner
   if (!planResult) {
-    planResult = generateFallbackPlan(cleanGoal, stateStore.getState(), userTz);
+    planResult = generateFallbackPlan(cleanGoal, stateStore.getState(), userTz, new Date(), userLang);
     source = planResult.source || "Autonomous Engine (Deterministic Fallback)";
   }
 
   // Ensure single source of truth and canonical synchronization
-  planResult = validateAndSynchronizePlan(planResult, cleanGoal, userTz);
+  planResult = validateAndSynchronizePlan(planResult, cleanGoal, userTz, new Date(), userLang);
 
   // Ensure actions have consistent initial status
   const actions = (planResult.actions || []).map((action, index) => ({
@@ -360,30 +362,52 @@ app.post("/api/agent/resolve-conflict", (req, res) => {
 });
 
 // ==========================================
-// 7. ADAPTIVE RE-PLANNING
+// 7. ADAPTIVE RE-PLANNING & NATURAL-LANGUAGE EDITING
 // ==========================================
 app.post("/api/agent/replan", async (req, res) => {
-  const { reason, customApiKey, timeZone } = req.body;
+  const { reason, instruction, customApiKey, timeZone, language } = req.body;
   const userTz = timeZone || req.headers["x-timezone"] || DEFAULT_TIMEZONE;
+  const editInstruction = (instruction || reason || "").trim();
+  const userLang = normalizeLanguage(language || req.headers["x-language"] || LANG_EN, editInstruction);
+
   if (!stateStore.currentPlan) {
     return res.status(400).json({ success: false, message: "No active plan to re-plan." });
   }
 
-  const cleanReason = (reason || "Schedule conflict or change of constraints").trim();
+  const cleanReason = (editInstruction || "Schedule conflict or change of constraints").trim();
   stateStore.logActivity(
     "agent",
     `Adaptive Re-planning Triggered`,
-    `Reason: ${cleanReason}. Adjusting remaining workflow actions...`,
+    `Instruction: "${cleanReason}". Analyzing schedule impact and dependencies...`,
     "refresh-cw"
   );
 
-  const hasKey = !!(customApiKey || process.env.GEMINI_API_KEY);
   let updatedPlan = null;
 
-  if (hasKey) {
+  // First check if it's a specific natural language schedule edit (e.g. "Move my project work to 6 PM" or "extra class")
+  const isDirectEdit = /(?:move|shift|reschedule|बदलो|बदलें|भेजें|शिफ्ट|extra|new|an?\s+additional|naya|nayi|एक\s+और|नया|नई)\s+/i.test(cleanReason);
+
+  if (isDirectEdit) {
+    try {
+      updatedPlan = applyScheduleEdit(stateStore.currentPlan, cleanReason, userTz, new Date(), userLang);
+      if (updatedPlan) {
+        stateStore.logActivity(
+          "agent",
+          `Schedule Edit Applied: "${cleanReason}"`,
+          `Updated affected sessions; preserved remaining workflow. Consequential actions flagged for approval.`,
+          "sliders"
+        );
+      }
+    } catch (editErr) {
+      console.warn("Direct edit error:", editErr.message);
+    }
+  }
+
+  const hasKey = !!(customApiKey || process.env.GEMINI_API_KEY);
+  if (!updatedPlan && hasKey) {
     try {
       const prompt = `Current goal: "${stateStore.currentPlan.goal}". Something changed: "${cleanReason}". Please adapt and return a refreshed plan.`;
-      const geminiResp = await planWithGemini(prompt, stateStore.getState(), customApiKey, userTz);
+      const geminiResp = await planWithGemini(prompt, stateStore.getState(), customApiKey, userTz, new Date(), userLang);
       if (geminiResp.success && geminiResp.data) {
         updatedPlan = geminiResp.data;
         updatedPlan.source = geminiResp.source;
@@ -394,7 +418,8 @@ app.post("/api/agent/replan", async (req, res) => {
   }
 
   if (!updatedPlan) {
-    updatedPlan = {
+    // Deterministic fallback adaptation
+    updatedPlan = applyScheduleEdit(stateStore.currentPlan, cleanReason, userTz, new Date(), userLang) || {
       ...stateStore.currentPlan,
       summary: `Adapted workflow: ${stateStore.currentPlan.summary} (Buffer intervals added; remaining items rescheduled).`,
       actions: (stateStore.currentPlan.actions || []).map((a, idx) => ({
@@ -422,6 +447,13 @@ app.post("/api/agent/replan", async (req, res) => {
     message: "Plan adapted successfully",
     plan: stateStore.currentPlan
   });
+});
+
+// Dedicated alias for natural-language schedule edits
+app.post("/api/agent/edit", (req, res) => {
+  const { instruction, customApiKey, timeZone, language } = req.body;
+  req.body.reason = instruction;
+  return app._router.handle(req, res);
 });
 
 // Fallback route for SPA

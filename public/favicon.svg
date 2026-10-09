@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="apGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <!-- Sleek rounded dark badge background -->
+  <rect width="32" height="32" rx="8" fill="#0f172a"/>
+  <!-- Distinctive, clean geometric "A" with chevron pilot arrow -->
+  <path d="M16 6 L25 24 L20.5 24 L16 14.5 L11.5 24 L7 24 Z" fill="url(#apGrad)"/>
+  <!-- Pilot horizontal accent / guidance crossbar -->
+  <polygon points="16,11 19,18 13,18" fill="#0f172a"/>
+  <rect x="12" y="19" width="8" height="2.5" rx="1.2" fill="#38bdf8"/>
+</svg>

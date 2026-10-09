@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="dark-theme">
@@ -72,6 +73,16 @@
     </div>
 
     <div class="header-right">
+      <!-- Multilingual Selector -->
+      <div class="lang-selector-wrap" title="Select Planning Language">
+        <span class="lang-globe-icon">🌐</span>
+        <select id="langSelect" class="lang-select" aria-label="Select Language">
+          <option value="en">English</option>
+          <option value="hi">हिंदी (Hindi)</option>
+          <option value="hinglish">Hinglish</option>
+        </select>
+      </div>
+
       <!-- Honest Gemini AI Online/Offline Status Indicator -->
       <div class="engine-badge" id="engineStatusBadge" title="Engine Status">
         <span class="engine-indicator pulse" id="enginePulse"></span>
@@ -347,15 +358,22 @@
 
             <div class="plan-headline-row">
               <div class="plan-headline-lead">
-                <span class="mascot-badge-inline">
-                  <span class="mascot-mini-spark">✨</span>
-                  <span>PilotBot</span>
-                </span>
-                <h2 class="plan-hero-title">Here's your plan</h2>
+                <h2 class="plan-hero-title">Plan Overview</h2>
               </div>
               <p class="plan-overview-text" id="valPlanSummary">
                 Organized your presentation workflow into focused stages with dedicated rehearsal.
               </p>
+            </div>
+
+            <!-- CLARIFICATION NEEDED BANNER (Priority 1) -->
+            <div class="clarification-alert-card glass-panel hidden" id="clarificationAlertCard">
+              <div class="clarification-lead">
+                <span class="clarification-icon">❓</span>
+                <div class="clarification-content">
+                  <span class="clarification-title">Clarification Needed</span>
+                  <p class="clarification-message" id="valClarificationText"></p>
+                </div>
+              </div>
             </div>
 
             <!-- DESKTOP SPLIT GRID: PLAN ON LEFT, CALENDAR ON RIGHT -->
@@ -512,20 +530,23 @@
             </div>
           </div>
 
-          <!-- E. ADAPTIVE RE-PLANNING CARD -->
+          <!-- E. ADAPTIVE RE-PLANNING & NATURAL-LANGUAGE EDITING CARD (Priority 2 & 3) -->
           <div class="adaptive-replan-card glass-panel hidden" id="adaptiveReplanCard">
             <div class="replan-lead">
               <span class="replan-badge">ADAPTIVE INTELLIGENCE</span>
-              <h4 class="replan-title">Something changed.</h4>
-              <p class="replan-desc">ActionPilot can re-plan the remaining work.</p>
+              <h4 class="replan-title">Need to adjust your schedule?</h4>
+              <p class="replan-desc">Type changes in English, Hindi, or Hinglish (e.g., "Move project work to 6 PM", "Extra class tomorrow at 4 PM").</p>
             </div>
-            <button class="btn btn-secondary btn-replan" id="btnReplanWithAI">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-              </svg>
-              <span>Re-plan with AI &rarr;</span>
-            </button>
+            <div class="replan-input-group">
+              <input type="text" id="replanInput" class="replan-input" placeholder="e.g. Move demo practice to 6 PM / Kal extra class hai..." aria-label="Schedule adjustment instruction" />
+              <button class="btn btn-secondary btn-replan" id="btnReplanWithAI">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span>Re-plan &rarr;</span>
+              </button>
+            </div>
           </div>
 
           <!-- F. MISSION COMPLETE BLOCK WITH CELEBRATING MASCOT -->
