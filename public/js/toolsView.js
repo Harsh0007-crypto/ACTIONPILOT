@@ -8,11 +8,17 @@ const ToolsView = {
   init() {
     const tabButtons = document.querySelectorAll(".tool-tab-btn");
     tabButtons.forEach(btn => {
+      btn.setAttribute("role", "tab");
+      btn.setAttribute("aria-selected", btn.classList.contains("active") ? "true" : "false");
       btn.addEventListener("click", () => {
-        tabButtons.forEach(b => b.classList.remove("active"));
+        tabButtons.forEach(b => {
+          b.classList.remove("active");
+          b.setAttribute("aria-selected", "false");
+        });
         document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
 
         btn.classList.add("active");
+        btn.setAttribute("aria-selected", "true");
         const targetId = btn.getAttribute("data-tab");
         const targetPane = document.getElementById(targetId);
         if (targetPane) targetPane.classList.add("active");
@@ -45,6 +51,7 @@ const ToolsView = {
 
     container.innerHTML = tasks.map(task => {
       const isCompleted = task.status === "completed";
+      const escapedTitle = this.escapeHtml(task.title);
       return `
         <div class="task-item-card ${isCompleted ? 'completed' : ''}" data-id="${task.id}">
           <input 
@@ -52,6 +59,7 @@ const ToolsView = {
             class="task-checkbox" 
             ${isCompleted ? 'checked' : ''} 
             data-id="${task.id}"
+            aria-label="Mark task ${escapedTitle} as ${isCompleted ? 'incomplete' : 'completed'}"
             title="Toggle status"
           />
           <div class="task-item-content">

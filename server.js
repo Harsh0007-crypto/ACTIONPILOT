@@ -130,10 +130,23 @@ app.post("/api/state/reset", (req, res) => {
 
 app.post("/api/tasks/:id/status", (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const status = req.body ? req.body.status : undefined;
+
+  if (status && status !== "completed" && status !== "pending" && status !== "in-progress") {
+    return res.status(400).json({
+      success: false,
+      error: "INVALID_STATUS",
+      message: "Status must be 'completed', 'pending', or 'in-progress'."
+    });
+  }
+
   const task = stateStore.tasks.find(t => t.id === id);
   if (!task) {
-    return res.status(404).json({ success: false, message: "Task not found" });
+    return res.status(404).json({
+      success: false,
+      error: "TASK_NOT_FOUND",
+      message: "Task not found"
+    });
   }
   task.status = status || (task.status === "completed" ? "pending" : "completed");
   stateStore.logActivity("tool", `Task ${task.status === "completed" ? "Completed" : "Reopened"}: "${task.title}"`, `User manually updated task state`, "check");
