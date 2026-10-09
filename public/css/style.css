@@ -22,10 +22,10 @@
   --neon-amber: #f59e0b;
   --neon-rose: #f43f5e;
 
-  /* Typography */
+  /* Typography with WCAG-Compliant High Contrast */
   --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-faint: #64748b;
+  --text-muted: #cbd5e1;
+  --text-faint: #94a3b8;
   --font-main: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', Consolas, Monaco, monospace;
 
@@ -36,6 +36,11 @@
   --radius-full: 9999px;
   --shadow-card: 0 16px 40px -15px rgba(0, 0, 0, 0.7), 0 0 1px 1px var(--border-subtle);
   --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:focus-visible {
+  outline: 2px solid var(--neon-cyan) !important;
+  outline-offset: 2px !important;
 }
 
 *, *::before, *::after {

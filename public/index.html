@@ -89,7 +89,7 @@
         <span class="engine-label" id="engineLabel">Gemini AI ● Offline</span>
       </div>
 
-      <button class="btn btn-ghost" id="btnSettings" title="Configure Gemini API Key">
+      <button class="btn btn-ghost" id="btnSettings" title="Configure Gemini API Key" aria-label="Configure Gemini API Key">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -97,7 +97,7 @@
         <span>Settings</span>
       </button>
 
-      <button class="btn btn-ghost" id="btnResetState" title="Reset Workspace to Clean State">
+      <button class="btn btn-ghost" id="btnResetState" title="Reset Workspace to Clean State" aria-label="Reset Workspace to Clean State">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="23 4 23 10 17 10"></polyline>
           <polyline points="1 20 1 14 7 14"></polyline>
@@ -177,10 +177,11 @@
                 class="goal-textarea" 
                 rows="2" 
                 placeholder="What do you want to get done?"
+                aria-label="What do you want to get done?"
                 spellcheck="false"
               ></textarea>
               <div class="input-actions">
-                <button class="btn btn-primary btn-run" id="btnRunAgent">
+                <button class="btn btn-primary btn-run" id="btnRunAgent" aria-label="Plan with AI">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="run-icon">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                   </svg>
@@ -212,7 +213,7 @@
       </section>
 
       <!-- AI THINKING STATE CARD WITH MASCOT -->
-      <section class="ai-thinking-card glass-panel hidden" id="aiThinkingState">
+      <section class="ai-thinking-card glass-panel hidden" id="aiThinkingState" role="status" aria-live="polite">
         <div class="ai-thinking-layout">
           <div class="ai-thinking-visual">
             <div class="thinking-mascot-avatar">
@@ -257,7 +258,7 @@
       </section>
 
       <!-- AI WORKFLOW SECTION (UNDERSTAND -> PLAN -> APPROVE -> EXECUTE -> COMPLETE) -->
-      <section class="workflow-card-section hidden" id="workflowCardSection">
+      <section class="workflow-card-section hidden" id="workflowCardSection" aria-live="polite">
 
         <!-- 4-Stage Illustrated Stepper Header (Keep IDs for test compatibility) -->
         <div class="workflow-stepper-bar">
@@ -366,7 +367,7 @@
             </div>
 
             <!-- CLARIFICATION NEEDED BANNER (Priority 1) -->
-            <div class="clarification-alert-card glass-panel hidden" id="clarificationAlertCard">
+            <div class="clarification-alert-card glass-panel hidden" id="clarificationAlertCard" role="alert" aria-live="assertive">
               <div class="clarification-lead">
                 <span class="clarification-icon">❓</span>
                 <div class="clarification-content">
@@ -387,7 +388,7 @@
 
                 <!-- Collapsible "Why this plan?" Section with concise user-facing bullets -->
                 <div class="why-this-plan-container" id="whyThisPlanSection">
-                  <button class="why-toggle-btn" id="toggleWhyThisPlan" aria-expanded="false">
+                  <button class="why-toggle-btn" id="toggleWhyThisPlan" aria-expanded="false" aria-controls="whyThisPlanContent">
                     <div class="why-toggle-label">
                       <span class="why-icon">💡</span>
                       <span>Why this plan?</span>
@@ -405,7 +406,7 @@
                 </div>
 
                 <!-- Dynamic Conflict Detection Banner -->
-                <div class="conflict-banner" id="conflictBanner">
+                <div class="conflict-banner" id="conflictBanner" role="status" aria-live="polite">
                   <div class="conflict-lead">
                     <span class="conflict-badge-icon" id="conflictIcon">✓</span>
                     <div class="conflict-info">
@@ -482,9 +483,9 @@
 
           <!-- C. HUMAN APPROVAL BLOCK -->
           <div class="workflow-block approval-block" id="blockApproval">
-            <div class="approval-alert-card" id="approvalAlertCard">
+            <div class="approval-alert-card" id="approvalAlertCard" role="region" aria-label="Human Approval Required">
               <div class="approval-lead">
-                <div class="approval-shield-icon">🛡️</div>
+                <div class="approval-shield-icon" aria-hidden="true">🛡️</div>
                 <div class="approval-info">
                   <span class="approval-headline">HUMAN APPROVAL REQUIRED</span>
                   <p class="approval-action-count" id="valApprovalCount">
@@ -497,11 +498,11 @@
                 </div>
               </div>
               <div class="approval-controls">
-                <button class="btn btn-reject" id="btnRejectAction">
+                <button class="btn btn-reject" id="btnRejectAction" aria-label="Reject sensitive calendar booking">
                   <span>REJECT</span>
                 </button>
-                <button class="btn btn-approve-execute" id="btnApproveAction">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <button class="btn btn-approve-execute" id="btnApproveAction" aria-label="Approve and execute plan actions">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
                   <span>APPROVE &amp; EXECUTE &rarr;</span>
@@ -550,7 +551,7 @@
           </div>
 
           <!-- F. MISSION COMPLETE BLOCK WITH CELEBRATING MASCOT -->
-          <div class="workflow-block complete-block hidden" id="blockComplete">
+          <div class="workflow-block complete-block hidden" id="blockComplete" role="status" aria-live="polite">
             <div class="complete-hero-box">
               <div class="complete-mascot-celebrate">
                 <svg viewBox="0 0 80 80" fill="none" class="celebrate-mascot-svg">
@@ -725,7 +726,7 @@
           </svg>
           <h3>ActionPilot Engine Settings</h3>
         </div>
-        <button class="btn-close-modal" id="btnCloseSettings">&times;</button>
+        <button class="btn-close-modal" id="btnCloseSettings" aria-label="Close Settings">&times;</button>
       </div>
 
       <div class="settings-content">
@@ -767,8 +768,8 @@
       </div>
 
       <div class="settings-footer">
-        <button class="btn btn-secondary" id="btnCancelSettings">Cancel</button>
-        <button class="btn btn-primary" id="btnSaveSettings">Save Preferences</button>
+        <button class="btn btn-secondary" id="btnCancelSettings" aria-label="Cancel and close settings">Cancel</button>
+        <button class="btn btn-primary" id="btnSaveSettings" aria-label="Save Preferences">Save Preferences</button>
       </div>
     </div>
   </div>

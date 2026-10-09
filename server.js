@@ -22,10 +22,65 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 
+// Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), {
+  maxAge: "1d",
+  etag: true
+}));
+
+// ==========================================
+// IN-MEMORY PLAN CACHE (High-Efficiency Memoization)
+// ==========================================
+class PlanCache {
+  constructor(maxSize = 64, ttlMs = 10 * 60 * 1000) {
+    this.maxSize = maxSize;
+    this.ttlMs = ttlMs;
+    this.cache = new Map();
+  }
+
+  generateKey(goal, timeZone, language, customApiKey, stateSig) {
+    const norm = (goal || "").trim().toLowerCase();
+    return `${norm}::${timeZone}::${language}::custom=${!!customApiKey}::${stateSig}`;
+  }
+
+  get(key) {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > this.ttlMs) {
+      this.cache.delete(key);
+      return null;
+    }
+    return JSON.parse(JSON.stringify(entry.data));
+  }
+
+  set(key, data) {
+    if (this.cache.size >= this.maxSize) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+    }
+    this.cache.set(key, {
+      timestamp: Date.now(),
+      data: JSON.parse(JSON.stringify(data))
+    });
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+}
+
+const planCache = new PlanCache();
 
 // ==========================================
 // 1. HEALTH & SYSTEM STATUS
@@ -64,6 +119,7 @@ app.get("/api/state", (req, res) => {
 
 app.post("/api/state/reset", (req, res) => {
   stateStore.reset();
+  planCache.clear();
   stateStore.logActivity("system", "Workspace Reset", "Restored demo environment with baseline tasks and schedule", "refresh-cw");
   res.json({
     success: true,
@@ -101,6 +157,32 @@ app.post("/api/agent/plan", async (req, res) => {
   }
 
   const cleanGoal = goal.trim();
+  if (cleanGoal.length > 4000) {
+    return res.status(400).json({
+      success: false,
+      error: "INPUT_TOO_LARGE",
+      message: "Goal statement exceeds maximum allowed length (4000 characters)."
+    });
+  }
+
+  // Check In-Memory Plan Cache (High-Efficiency Short-Circuit)
+  const stateSig = `${stateStore.tasks.length}:${stateStore.schedule.length}`;
+  const cacheKey = planCache.generateKey(cleanGoal, userTz, userLang, customApiKey, stateSig);
+  const cachedPlanData = planCache.get(cacheKey);
+
+  if (cachedPlanData) {
+    stateStore.currentPlan = cachedPlanData.plan;
+    stateStore.pendingApprovals = cachedPlanData.pendingApprovals;
+    stateStore.logActivity("agent", `Plan Retrieved (Instant Cache)`, `Zero-latency memoized synthesis for: "${cleanGoal.slice(0, 60)}"`, "zap");
+    return res.json({
+      success: true,
+      source: cachedPlanData.source,
+      cached: true,
+      plan: cachedPlanData.plan,
+      pendingApprovals: cachedPlanData.pendingApprovals
+    });
+  }
+
   stateStore.logActivity("agent", `Analyzing Goal: "${cleanGoal.slice(0, 80)}${cleanGoal.length > 80 ? "..." : ""}"`, `Parsing intent, language [${userLang}], extracting constraints, and mapping dependencies`, "compass");
 
   let planResult = null;
@@ -150,6 +232,13 @@ app.post("/api/agent/plan", async (req, res) => {
 
   stateStore.currentPlan = structuredPlan;
   stateStore.pendingApprovals = actions.filter(a => a.requiresApproval && a.status === "planned");
+
+  // Save to in-memory plan cache
+  planCache.set(cacheKey, {
+    source,
+    plan: structuredPlan,
+    pendingApprovals: stateStore.pendingApprovals
+  });
 
   stateStore.logActivity("agent", "Plan Decomposed", `${planResult.tasks.length} tasks identified, ${actions.length} action steps queued`, "layers");
   if (stateStore.pendingApprovals.length > 0) {
@@ -243,7 +332,31 @@ app.post("/api/agent/execute-action", (req, res) => {
 // 5. HUMAN-IN-THE-LOOP APPROVAL / REJECTION
 // ==========================================
 app.post("/api/agent/approve-action", (req, res) => {
+  if (!req.body || typeof req.body !== "object") {
+    return res.status(400).json({
+      success: false,
+      error: "INVALID_REQUEST",
+      message: "Request body must be a valid JSON object."
+    });
+  }
+
   const { actionId, decision } = req.body; // decision: "approved" | "rejected"
+
+  if (!actionId || typeof actionId !== "string" || actionId.trim().length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: "INVALID_ACTION_ID",
+      message: "actionId must be a valid string."
+    });
+  }
+
+  if (decision !== "approved" && decision !== "rejected") {
+    return res.status(400).json({
+      success: false,
+      error: "INVALID_DECISION",
+      message: "Decision must be 'approved' or 'rejected'."
+    });
+  }
 
   if (!stateStore.currentPlan) {
     return res.status(400).json({
@@ -364,14 +477,14 @@ app.post("/api/agent/resolve-conflict", (req, res) => {
 // ==========================================
 // 7. ADAPTIVE RE-PLANNING & NATURAL-LANGUAGE EDITING
 // ==========================================
-app.post("/api/agent/replan", async (req, res) => {
-  const { reason, instruction, customApiKey, timeZone, language } = req.body;
+async function handleAdaptiveReplan(req, res) {
+  const { reason, instruction, customApiKey, timeZone, language } = req.body || {};
   const userTz = timeZone || req.headers["x-timezone"] || DEFAULT_TIMEZONE;
   const editInstruction = (instruction || reason || "").trim();
   const userLang = normalizeLanguage(language || req.headers["x-language"] || LANG_EN, editInstruction);
 
   if (!stateStore.currentPlan) {
-    return res.status(400).json({ success: false, message: "No active plan to re-plan." });
+    return res.status(400).json({ success: false, error: "NO_ACTIVE_PLAN", message: "No active plan to re-plan." });
   }
 
   const cleanReason = (editInstruction || "Schedule conflict or change of constraints").trim();
@@ -447,13 +560,16 @@ app.post("/api/agent/replan", async (req, res) => {
     message: "Plan adapted successfully",
     plan: stateStore.currentPlan
   });
-});
+}
+
+app.post("/api/agent/replan", handleAdaptiveReplan);
 
 // Dedicated alias for natural-language schedule edits
 app.post("/api/agent/edit", (req, res) => {
-  const { instruction, customApiKey, timeZone, language } = req.body;
-  req.body.reason = instruction;
-  return app._router.handle(req, res);
+  if (req.body && req.body.instruction && !req.body.reason) {
+    req.body.reason = req.body.instruction;
+  }
+  return handleAdaptiveReplan(req, res);
 });
 
 // Fallback route for SPA

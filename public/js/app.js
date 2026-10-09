@@ -635,8 +635,6 @@ const App = {
       thinkingState.classList.remove("hidden");
       thinkingState.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    await this.animateThinkingSteps();
-
     // 1. UNDERSTAND BECOMES ACTIVE
     this.setStepper(1);
     const goalText = document.getElementById("valGoalText");
@@ -652,7 +650,8 @@ const App = {
       const customKey = sessionStorage.getItem("custom_gemini_key") || null;
       const userTz = this.getUserTimeZone();
 
-      const planResp = await fetch("/api/agent/plan", {
+      // Launch network fetch and animated cognition checkpoints concurrently for maximum responsiveness
+      const fetchPromise = fetch("/api/agent/plan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -666,6 +665,9 @@ const App = {
           language: this.selectedLanguage
         })
       });
+
+      const animPromise = this.animateThinkingSteps();
+      const [planResp] = await Promise.all([fetchPromise, animPromise]);
 
       const planData = await planResp.json();
       if (!planData.success || !planData.plan) {
